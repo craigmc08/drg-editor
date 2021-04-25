@@ -58,7 +58,6 @@ impl ObjectExport {
     let was_filtered = read_bool(rdr);
     let package_guid = read_bytes(rdr, 16);
     let not_always_loaded_for_editor_game = read_bool(rdr);
-    println!("{:X}", rdr.position());
     let is_asset = read_bool(rdr);
     let first_export_dependency = read_u32(rdr);
     let serialization_before_serialization_dependencies = read_u32(rdr);

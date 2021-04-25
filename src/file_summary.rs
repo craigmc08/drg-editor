@@ -60,7 +60,6 @@ pub struct FileSummary {
 
 impl Generation {
   fn read(rdr: &mut Cursor<Vec<u8>>) -> Self {
-    println!("Reading Generation at {}", rdr.position());
     let export_count = read_u32(rdr);
     let name_count = read_u32(rdr);
     Generation {

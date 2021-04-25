@@ -65,10 +65,8 @@ impl PropertyValue {
         let value_tag = names.read_name(rdr, "ArrayProperty value_tag")?;
         rdr.consume(1); // padding is after value tag
         let length = read_u32(rdr);
-        println!("Array of {} [{}]", value_tag, length);
         let mut values = vec![];
         for _ in 0..length {
-          println!("item {:04X}", rdr.position());
           let value = Self::read(rdr, &value_tag, names, imports)?;
           values.push(value);
         }
@@ -137,7 +135,6 @@ impl Property {
     names: &NameMap,
     imports: &ObjectImports,
   ) -> Result<Option<Self>, String> {
-    println!("{:04X}", rdr.position());
     let name = names.read_name(rdr, "Property name")?;
     if &name == "None" {
       return Ok(None);
