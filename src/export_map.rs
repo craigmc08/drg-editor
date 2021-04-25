@@ -8,33 +8,33 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct ObjectExport {
-  class: String, // stored as (-n - 1) int32 index into object_imports, or uint32_max - value
-  super_index: i32, // not sure what this represents
-  template: String, // stored same as `class`
-  outer: i32,    // again, idk
-  object_name: String, // stored as index into name_map
-  object_flags: u64, // just some bytes
-  serial_size: u64, // size of uexp struct, 4 bytes of padding after this are incorporated into the value?
-  serial_offset: u32, // same as file_summary.total_header_size
-  export_file_offset: u32,
-  forced_export: bool,  // 4 bytes
-  not_for_client: bool, // 4 bytes
-  not_for_server: bool, // 4 bytes
-  was_filtered: bool,   // 4 bytes
-  package_guid: [u8; 16],
-  package_flags: u32,                      // doesn't exist in file?
-  not_always_loaded_for_editor_game: bool, // 4 bytes
-  is_asset: bool,                          // 4 bytes
-  first_export_dependency: u32,
-  serialization_before_serialization_dependencies: u32,
-  create_before_serialization_dependencies: u32,
-  serialization_before_create_dependencies: u32,
-  create_before_create_dependencies: u32,
+  pub class: String, // stored as (-n - 1) int32 index into object_imports, or uint32_max - value
+  pub super_index: i32, // not sure what this represents
+  pub template: String, // stored same as `class`
+  pub outer: i32,    // again, idk
+  pub object_name: String, // stored as index into name_map
+  pub object_flags: u64, // just some bytes
+  pub serial_size: u64, // size of uexp struct, 4 bytes of padding after this are incorporated into the value?
+  pub serial_offset: u32, // same as file_summary.total_header_size
+  pub export_file_offset: u32,
+  pub forced_export: bool,  // 4 bytes
+  pub not_for_client: bool, // 4 bytes
+  pub not_for_server: bool, // 4 bytes
+  pub was_filtered: bool,   // 4 bytes
+  pub package_guid: [u8; 16],
+  pub package_flags: u32,                      // doesn't exist in file?
+  pub not_always_loaded_for_editor_game: bool, // 4 bytes
+  pub is_asset: bool,                          // 4 bytes
+  pub first_export_dependency: u32,
+  pub serialization_before_serialization_dependencies: u32,
+  pub create_before_serialization_dependencies: u32,
+  pub serialization_before_create_dependencies: u32,
+  pub create_before_create_dependencies: u32,
 }
 
 #[derive(Debug)]
 pub struct ObjectExports {
-  exports: Vec<ObjectExport>,
+  pub exports: Vec<ObjectExport>,
 }
 
 impl ObjectExport {

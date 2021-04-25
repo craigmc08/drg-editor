@@ -40,11 +40,11 @@ pub enum PropertyValue {
 
 #[derive(Debug)]
 pub struct Property {
-  name: String, // u64 index into name_map
-  tag: String,  // u64 index into name map
+  pub name: String, // u64 index into name_map
+  pub tag: String,  // u64 index into name map
   // 1 byte of padding?
-  size: u64, // size of property
-  value: PropertyValue,
+  pub size: u64, // size of property
+  pub value: PropertyValue,
 }
 
 impl PropertyValue {

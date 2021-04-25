@@ -4,9 +4,8 @@ pub mod file_summary;
 pub mod name_map;
 pub mod object_imports;
 pub mod preload_dependencies;
-pub mod util;
-pub mod data;
 pub mod property;
+pub mod util;
 
 use asset_registry::*;
 use export_map::*;
@@ -17,6 +16,50 @@ use preload_dependencies::*;
 use property::*;
 use std::env;
 use std::io::Cursor;
+
+fn recalculate_offsets(
+    summary: &mut FileSummary,
+    names: &NameMap,
+    imports: &ObjectImports,
+    exports: &mut ObjectExports,
+    assets: &AssetRegistry,
+    dependencies: &PreloadDependencies,
+    properties: &Vec<Property>,
+) {
+    summary.total_header_size = (summary.byte_size()
+        + names.byte_size()
+        + imports.byte_size()
+        + exports.byte_size()
+        + assets.byte_size()
+        + dependencies.byte_size()) as u32;
+    summary.name_count = names.names.len() as u32;
+    summary.name_offset = summary.byte_size() as u32;
+    summary.export_count = exports.exports.len() as u32;
+    summary.export_offset = (summary.byte_size() + names.byte_size() + imports.byte_size()) as u32;
+    summary.import_count = imports.objects.len() as u32;
+    summary.import_offset = (summary.byte_size() + names.byte_size()) as u32;
+    summary.depends_offset =
+        (summary.byte_size() + names.byte_size() + imports.byte_size() + exports.byte_size() - 4)
+            as u32;
+    summary.asset_registry_data_offset =
+        (summary.byte_size() + names.byte_size() + imports.byte_size() + exports.byte_size())
+            as u32;
+    summary.bulk_data_start_offset = (summary.byte_size()
+        + names.byte_size()
+        + imports.byte_size()
+        + exports.byte_size()
+        + assets.byte_size()
+        + dependencies.byte_size()
+        + Property::struct_size(properties)) as u32;
+    summary.preload_dependency_count = dependencies.dependencies.len() as u32;
+    summary.preload_dependency_offset = (summary.byte_size()
+        + names.byte_size()
+        + imports.byte_size()
+        + exports.byte_size()
+        + assets.byte_size()) as u32;
+    exports.exports[0].serial_size = Property::struct_size(properties) as u64;
+    exports.exports[0].serial_offset = summary.total_header_size;
+}
 
 fn main() {
     let args: Vec<String> = env::args().collect();

@@ -4,7 +4,7 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct PreloadDependencies {
-  dependencies: Vec<String>, // for each value (-n - 1) in dependencies, n is an index into object_imports
+  pub dependencies: Vec<String>, // for each value (-n - 1) in dependencies, n is an index into object_imports
 }
 
 impl PreloadDependencies {

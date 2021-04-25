@@ -5,15 +5,15 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct ObjectImport {
-  class_package: String, // stored in file as uint64 index into name_map
-  class: String,         // same as before
-  outer_index: i32,      // idk what this represents
-  name: String,          // same as class_package
+  pub class_package: String, // stored in file as uint64 index into name_map
+  pub class: String,         // same as before
+  pub outer_index: i32,      // idk what this represents
+  pub name: String,          // same as class_package
 }
 
 #[derive(Debug)]
 pub struct ObjectImports {
-  objects: Vec<ObjectImport>,
+  pub objects: Vec<ObjectImport>,
 }
 
 impl ObjectImport {

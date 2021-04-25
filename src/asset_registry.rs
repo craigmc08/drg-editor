@@ -5,7 +5,7 @@ use std::io::BufRead;
 
 #[derive(Debug)]
 pub struct AssetRegistry {
-  size: u32, // seems to always be 0?
+  pub size: u32, // seems to always be 0?
 }
 
 impl AssetRegistry {
