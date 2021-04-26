@@ -45,4 +45,8 @@ impl PreloadDependencies {
     // 4 bytes per string index
     self.dependencies.len() * 4
   }
+
+  pub fn add(&mut self, name: &str) -> () {
+    self.dependencies.push(name.to_string())
+  }
 }

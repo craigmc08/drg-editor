@@ -98,6 +98,17 @@ impl NameMap {
     return Ok(&self.names[index as usize]);
   }
 
+  pub fn add(&mut self, name: &str) -> () {
+    let index = self.names.len() as u64;
+    let name_obj = Name {
+      index,
+      name: name.to_string(),
+      non_case_preserving_hash: 0,
+      case_preserving_hash: 0,
+    };
+    self.names.push(name_obj)
+  }
+
   pub fn read_name(&self, rdr: &mut Cursor<Vec<u8>>, rep: &str) -> Result<String, String> {
     let index = rdr.read_u64::<LittleEndian>().unwrap();
     return self.lookup(index, rep).map(|x| x.name.clone());

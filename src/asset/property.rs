@@ -72,7 +72,7 @@ pub struct Property {
   pub name: String, // u64 index into name_map
   pub tag: String,  // u64 index into name map
   // 1 byte of padding?
-  pub size: u64, // size of property
+  // 8 bytes for size
   pub value: PropertyValue,
 }
 
@@ -202,6 +202,28 @@ impl PropertyValue {
       Self::SoftObjectProperty { .. } => 12,
     }
   }
+
+  pub fn value_size(&self) -> usize {
+    match self {
+      Self::BoolProperty { .. } => 4,
+      Self::ByteProperty { .. } => 1,
+      Self::ArrayProperty { values, .. } => {
+        // u32 size = 4, values
+        4 + values.into_iter().map(|x| x.byte_size()).sum::<usize>()
+      }
+      Self::ObjectProperty { .. } => 4,
+      Self::Int8Property { .. } => 1,
+      Self::Int16Property { .. } => 2,
+      Self::IntProperty { .. } => 4,
+      Self::Int64Property { .. } => 8,
+      Self::UInt16Property { .. } => 2,
+      Self::UInt32Property { .. } => 4,
+      Self::UInt64Property { .. } => 8,
+      Self::FloatProperty { .. } => 4,
+      Self::DoubleProperty { .. } => 8,
+      Self::SoftObjectProperty { .. } => 12,
+    }
+  }
 }
 
 impl Property {
@@ -216,7 +238,7 @@ impl Property {
     }
 
     let tag = names.read_name(rdr, "Property tag")?;
-    let size = rdr.read_u64::<LittleEndian>().unwrap();
+    let _size = rdr.read_u64::<LittleEndian>().unwrap();
     if tag != "ArrayProperty" {
       // This shouldn't happen for arrayproperties, because idk
       rdr.consume(1); // weird 1 byte of padding for some reason
@@ -232,7 +254,6 @@ impl Property {
     return Ok(Some(Property {
       name,
       tag,
-      size,
       value,
     }));
   }
@@ -244,7 +265,7 @@ impl Property {
     let tag = names.get_name_obj(&self.tag).expect("Invalid Property tag");
     curs.write_u64::<LittleEndian>(name.index).unwrap();
     curs.write_u64::<LittleEndian>(tag.index).unwrap();
-    curs.write_u64::<LittleEndian>(self.size).unwrap();
+    curs.write_u64::<LittleEndian>(self.value.value_size() as u64).unwrap();
     if self.tag != "ArrayProperty" {
       // See note in self.read, this is bad
       curs.write(&[0]).unwrap();
@@ -300,5 +321,14 @@ impl Property {
   pub fn struct_size(properties: &Vec<Property>) -> usize {
     // Size of properties plus size of None property at end of the struct
     properties.iter().map(|x| x.byte_size()).sum::<usize>() + 12
+  }
+
+  pub fn find<'a>(properties: &'a mut Vec<Property>, name: &str) -> Option<&'a mut Property> {
+    for prop in properties.iter_mut() {
+      if prop.name == name {
+        return Some(prop)
+      }
+    }
+    return None
   }
 }

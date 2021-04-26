@@ -105,6 +105,18 @@ impl ObjectImports {
     return Ok(&self.objects[index as usize]);
   }
 
+  pub fn add(&mut self, class_package: &str, class: &str, name: &str, idx: i32) -> i32 {
+    let object = ObjectImport {
+      class_package: class_package.to_string(),
+      class: class.to_string(),
+      name: name.to_string(),
+      outer_index: idx
+    };
+    let len = self.objects.len();
+    self.objects.push(object);
+    return -(len as i32) - 1;
+  }
+
   pub fn read_import(&self, rdr: &mut Cursor<Vec<u8>>, rep: &str) -> Result<String, String> {
     let index_raw = rdr.read_u32::<LittleEndian>().unwrap();
     let index = std::u32::MAX - index_raw; // import indices are stored as -index - 1, for some reason

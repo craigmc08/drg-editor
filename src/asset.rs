@@ -79,10 +79,10 @@ impl Asset {
     self.summary.import_count = self.imports.objects.len() as u32;
     self.summary.import_offset = (self.summary.byte_size() + self.names.byte_size()) as u32;
     self.summary.depends_offset =
-        (self.summary.byte_size() + self.names.byte_size() + self.imports.byte_size() + self.exports.byte_size() - 4)
+        (self.summary.byte_size() + self.names.byte_size() + self.imports.byte_size() + self.exports.byte_size())
             as u32;
     self.summary.asset_registry_data_offset =
-        (self.summary.byte_size() + self.names.byte_size() + self.imports.byte_size() + self.exports.byte_size())
+        (self.summary.byte_size() + self.names.byte_size() + self.imports.byte_size() + self.exports.byte_size() + 4)
             as u32;
     self.summary.bulk_data_start_offset = (self.summary.byte_size()
         + self.names.byte_size()
