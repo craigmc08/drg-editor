@@ -18,7 +18,8 @@ pub enum PropertyTag {
   UInt64Property,
   FloatProperty,
   DoubleProperty,
-  // EnumProperty, TODO
+
+  EnumProperty,
   // TextProperty, TODO
   // StrProperty, TODO
   // NameProperty, TODO
@@ -52,6 +53,7 @@ impl PropertyTag {
       "UInt64Property" => Ok(Self::UInt64Property),
       "FloatProperty" => Ok(Self::FloatProperty),
       "DoubleProperty" => Ok(Self::DoubleProperty),
+      "EnumProperty" => Ok(Self::EnumProperty),
       "ArrayProperty" => Ok(Self::ArrayProperty),
       "ObjectProperty" => Ok(Self::ObjectProperty),
       "StructProperty" => Ok(Self::StructProperty),
@@ -73,6 +75,7 @@ impl PropertyTag {
       Self::UInt64Property => "UInt64Property",
       Self::FloatProperty => "FloatProperty",
       Self::DoubleProperty => "DoubleProperty",
+      Self::EnumProperty => "EnumProperty",
       Self::ArrayProperty => "ArrayProperty",
       Self::ObjectProperty => "ObjectProperty",
       Self::StructProperty => "StructProperty",
@@ -98,6 +101,7 @@ impl PropertyTag {
 pub enum PropertyTagData {
   EmptyTag { tag: PropertyTag },
   BoolTag { value: bool },
+  EnumTag { name: String, name_variant: u32 },
   ArrayTag { value_tag: PropertyTag },
   StructTag { name: String, name_variant: u32, guid: [u8; 16] },
 }
@@ -108,6 +112,10 @@ impl PropertyTagData {
     let data = match tag {
       PropertyTag::BoolProperty => {
         Self::BoolTag { value: rdr.read_u8().unwrap() != 0 }
+      }
+      PropertyTag::EnumProperty => {
+        let (name, name_variant) = names.read_name_with_variant(rdr, "EnumTag.name")?;
+        Self::EnumTag { name, name_variant }
       }
       PropertyTag::ArrayProperty => {
         Self::ArrayTag { value_tag: PropertyTag::read(rdr, names)? }
@@ -129,6 +137,9 @@ impl PropertyTagData {
       Self::BoolTag { value } => {
         curs.write_u8(if *value { 1 } else { 0 }).unwrap();
       }
+      Self::EnumTag { name, name_variant } => {
+        names.write_name_with_variant(curs, name, *name_variant, "EnumTag.name");
+      }
       Self::ArrayTag { value_tag } => {
         value_tag.write(curs, names);
       }
@@ -145,8 +156,9 @@ impl PropertyTagData {
     match self {
       Self::EmptyTag { .. } => 1, // just padding
       Self::BoolTag { .. } => 2, // u8 value + padding
+      Self::EnumTag { .. } => 8, // name + name_variant
       Self::ArrayTag { value_tag } => value_tag.byte_size() + 1, // tag size + padding
-      Self::StructTag { .. } => 8 + 16 + 1, // name + guid[u8; 16] + padding
+      Self::StructTag { .. } => 8 + 16 + 1, // name + name_variant + guid[u8; 16] + padding
     }
   }
 }
@@ -230,6 +242,10 @@ pub enum PropertyValue {
   DoubleProperty {
     value: f64,
   },
+  EnumProperty {
+    value: String,
+    value_variant: u32,
+  },
   ArrayProperty {
     values: Vec<ArrayValue>,
   },
@@ -299,6 +315,10 @@ impl PropertyValue {
       PropertyTagData::EmptyTag { tag } => Err(format!("Illegal PropertyTagData object {:?}, report to maintainer", tag)),
       
       PropertyTagData::BoolTag { .. } => Ok(Self::BoolProperty {}),
+      PropertyTagData::EnumTag { .. } => {
+        let (value, value_variant) = names.read_name_with_variant(rdr, "EnumProperty.value")?;
+        Ok(Self::EnumProperty { value, value_variant })
+      }
       PropertyTagData::ArrayTag { value_tag } => {
         let length = read_u32(rdr);
         let mut values = vec![];
@@ -339,6 +359,9 @@ impl PropertyValue {
         write_u32(curs, *unk1);
       }
       Self::BoolProperty { } => { },
+      Self::EnumProperty { value, value_variant } => {
+        names.write_name_with_variant(curs, value, *value_variant, "EnumProperty.value");
+      }
       Self::ArrayProperty { values } => {
         write_u32(curs, values.len() as u32);
         for value in values.iter() {
@@ -364,6 +387,7 @@ impl PropertyValue {
       Self::UInt64Property { .. } => 8,
       Self::FloatProperty { .. } => 4,
       Self::DoubleProperty { .. } => 8,
+      Self::EnumProperty { .. } => 8,
       Self::ArrayProperty { values, .. } => {
         // u32 size + values
         4 + values.into_iter().map(|x| x.byte_size()).sum::<usize>()
@@ -395,7 +419,6 @@ impl Property {
   ) -> Result<Option<Self>, String> {
     let (name, name_variant) = names.read_name_with_variant(rdr, "Property name")?;
     if &name == "None" {
-      rdr.consume(4); // there are 4 more bytes after None name to consume
       return Ok(None);
     }
 
@@ -477,6 +500,7 @@ impl Struct {
     let end_pos = rdr.position();
     // The length of all the properties read (including the None)
     let bytes_read = end_pos - start_pos;
+    println!("From {} to {}, read {}/{} bytes and {} properties", start_pos, end_pos, bytes_read, export.serial_size, properties.len());
     let remaining = export.serial_size - bytes_read;
     let extra = read_bytes(rdr, remaining as usize);
     Ok(Self { properties, extra })
@@ -493,7 +517,6 @@ impl Struct {
       .expect("None should be in names map");
     curs.write_u32::<LittleEndian>(none.index).unwrap();
     write_u32(curs, 0); // None name_variant
-    write_u32(curs, 0);
 
     // Write extra data
     curs.write(&self.extra[..]).unwrap();
