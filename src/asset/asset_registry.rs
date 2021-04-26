@@ -1,36 +1,40 @@
 use crate::asset::*;
 use crate::util::*;
 use std::io::Cursor;
-use std::io::BufRead;
+use std::io::prelude::*;
 
 #[derive(Debug)]
 pub struct AssetRegistry {
-  pub size: u32, // seems to always be 0?
+  // Store bytes of depends and registry sections
+  pub depends: Vec<u8>,
+  pub registry: Vec<u8>,
 }
 
 impl AssetRegistry {
   pub fn read(rdr: &mut Cursor<Vec<u8>>, summary: &FileSummary) -> Result<Self, String> {
-    // Lazily didn't make Dependencies struct, so consume it here. This would break
-    // if there are any dependencies, so TODO kinda
-    rdr.consume(4);
-    if rdr.position() != summary.asset_registry_data_offset.into() {
+    // Asset registry actually contains both Depends and AssetsRegistry
+    if rdr.position() != summary.depends_offset.into() {
       return Err(
         format!(
-          "Error parsing AssetRegistry: Expected to be at position {}, but I'm at position {}",
-          summary.asset_registry_data_offset,
+          "Error parsing AssetRegistry: Expected to be at position {:04X}, but I'm at position {:04X}",
+          summary.depends_offset,
           rdr.position()
         )
         .to_string(),
       );
     }
 
-    let size = read_u32(rdr);
-    return Ok(AssetRegistry { size });
+    let depends_len = (summary.asset_registry_data_offset - summary.depends_offset) as usize;
+    let depends = read_bytes(rdr, depends_len);
+    let assets_len = (summary.preload_dependency_offset - summary.asset_registry_data_offset) as usize;
+    let registry = read_bytes(rdr, assets_len);
+
+    return Ok(AssetRegistry { depends, registry });
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
-    write_u32(curs, 0); // Dependencies struct, TODO kinda
-    write_u32(curs, self.size);
+    curs.write(&self.depends[..]).unwrap();
+    curs.write(&self.registry[..]).unwrap();
   }
 
   pub fn byte_size(&self) -> usize {

@@ -5,7 +5,7 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct Name {
-  pub index: u64,
+  pub index: u32,
   pub name: String,                  // Size as a uint32, then null terminated string
   pub non_case_preserving_hash: u16, // idk how this is calculated, idk if it matters
   pub case_preserving_hash: u16,     // ditto
@@ -45,7 +45,7 @@ impl NameMap {
     if rdr.position() != summary.name_offset.into() {
       return Err(
         format!(
-          "Error parsing NameMap: Expected to be at position {}, but I'm at position {}",
+          "Error parsing NameMap: Expected to be at position {:04X}, but I'm at position {:04X}",
           summary.name_offset,
           rdr.position()
         )
@@ -86,8 +86,8 @@ impl NameMap {
     return None;
   }
 
-  pub fn lookup(&self, index: u64, rep: &str) -> Result<&Name, String> {
-    if index > self.names.len() as u64 {
+  pub fn lookup(&self, index: u32, rep: &str) -> Result<&Name, String> {
+    if index > self.names.len() as u32 {
       return Err(format!(
         "Name {} for {} is not in NameMap (length {})",
         index,
@@ -104,7 +104,7 @@ impl NameMap {
       return false;
     }
 
-    let index = self.names.len() as u64;
+    let index = self.names.len() as u32;
     let name_obj = Name {
       index,
       name: name.to_string(),
@@ -116,7 +116,16 @@ impl NameMap {
   }
 
   pub fn read_name(&self, rdr: &mut Cursor<Vec<u8>>, rep: &str) -> Result<String, String> {
-    let index = rdr.read_u64::<LittleEndian>().unwrap();
-    return self.lookup(index, rep).map(|x| x.name.clone());
+    let index = rdr.read_u32::<LittleEndian>().unwrap();
+    match self.lookup(index, rep).map(|x| x.name.clone()) {
+      Err(err) => Err(format!("{} at {:04X}", err, rdr.position())),
+      Ok(x) => Ok(x)
+    }
+  }
+
+  pub fn read_name_with_variant(&self, rdr: &mut Cursor<Vec<u8>>, rep: &str) -> Result<(String, u32), String> {
+    let name =self.read_name(rdr, rep)?;
+    let variant = read_u32(rdr);
+    Ok((name, variant))
   }
 }

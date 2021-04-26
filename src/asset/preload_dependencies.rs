@@ -3,8 +3,49 @@ use crate::util::*;
 use std::io::Cursor;
 
 #[derive(Debug)]
+pub enum Dependency {
+  Import(String, u32),
+  Export(String, u32),
+}
+
+impl Dependency {
+  pub fn read(rdr: &mut Cursor<Vec<u8>>, imports: &ObjectImports, exports: &ObjectExports) -> Result<Self, String> {
+    let idx = read_u32(rdr);
+    // If idx (as an i32) is negative
+    if (idx & 0x80000000) > 0 {
+      let import = imports.lookup(
+        (std::u32::MAX - idx) as u64,
+        &format!("PreloadDependency import @ {:04X}", rdr.position()),
+      )?;
+      Ok(Dependency::Import(import.name.clone(), import.name_variant))
+    } else {
+      let export = exports.lookup(
+        (idx - 1) as u64,
+        &format!("PreloadDependency export @ {:04X}", rdr.position()),
+      )?;
+      Ok(Dependency::Export(export.object_name.clone(), export.object_name_variant))
+    }
+  }
+
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, imports: &ObjectImports, exports: &ObjectExports) -> () {
+    let dep_i = match self {
+      Dependency::Import(name, variant) => imports
+        .serialized_index_of(name, *variant)
+        .expect("Invalid PreloadDependency import name"),
+      Dependency::Export(name, variant) => exports
+        .serialized_index_of(name, *variant)
+        .expect("Invalid PreloadDependency export name"),
+    };
+    write_u32(curs, dep_i);
+  }
+}
+
+#[derive(Debug)]
 pub struct PreloadDependencies {
-  pub dependencies: Vec<String>, // for each value (-n - 1) in dependencies, n is an index into object_imports
+  // each n in the dependencies array is:
+  // - negative? then -n - 1 is the index into imports
+  // - positive? then n - 1 is the index into exports
+  pub dependencies: Vec<Dependency>,
 }
 
 impl PreloadDependencies {
@@ -12,11 +53,12 @@ impl PreloadDependencies {
     rdr: &mut Cursor<Vec<u8>>,
     summary: &FileSummary,
     imports: &ObjectImports,
+    exports: &ObjectExports,
   ) -> Result<Self, String> {
     if rdr.position() != summary.preload_dependency_offset.into() {
       return Err(
         format!(
-          "Error parsing PreloadDependencies: Expected to be at position {}, but I'm at position {}",
+          "Error parsing PreloadDependencies: Expected to be at position {:04X}, but I'm at position {:04X}",
           summary.preload_dependency_offset,
           rdr.position()
         )
@@ -26,18 +68,45 @@ impl PreloadDependencies {
 
     let mut dependencies = vec![];
     for _ in 0..summary.preload_dependency_count {
-      let import =
-        imports.read_import(rdr, &format!("preload dependency @ {:04X}", rdr.position()))?;
-      dependencies.push(import);
+      let dependency = Dependency::read(rdr, imports, exports)?;
+      dependencies.push(dependency);
+      // let idx = read_u32(rdr);
+      // // If idx (as an i32) is negative
+      // if (idx & 0x80000000) > 0 {
+      //   let import = imports.lookup(
+      //     (std::u32::MAX - idx) as u64,
+      //     &format!("PreloadDependency import @ {:04X}", rdr.position()),
+      //   )?;
+      //   dependencies.push(Dependency::Import(import.name.clone(), import.name_variant));
+      // } else {
+      //   let export = exports.lookup(
+      //     (idx - 1) as u64,
+      //     &format!("PreloadDependency export @ {:04X}", rdr.position()),
+      //   )?;
+      //   dependencies.push(Dependency::Export(export.object_name.clone(), export.object_name_variant));
+      // }
     }
 
     return Ok(PreloadDependencies { dependencies });
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, imports: &ObjectImports) -> () {
+  pub fn write(
+    &self,
+    curs: &mut Cursor<Vec<u8>>,
+    imports: &ObjectImports,
+    exports: &ObjectExports,
+  ) -> () {
     for dep in self.dependencies.iter() {
-      let dep_i = imports.serialized_index_of(dep).expect("Invalid PreloadDependency name");
-      write_u32(curs, dep_i);
+      dep.write(curs, imports, exports);
+      // let dep_i = match dep {
+      //   Dependency::Import(name, variant) => imports
+      //     .serialized_index_of(name, *variant)
+      //     .expect("Invalid PreloadDependency import name"),
+      //   Dependency::Export(name, variant) => exports
+      //     .serialized_index_of(name, *variant)
+      //     .expect("Invalid PreloadDependency export name"),
+      // };
+      // write_u32(curs, dep_i);
     }
   }
 
@@ -46,7 +115,11 @@ impl PreloadDependencies {
     self.dependencies.len() * 4
   }
 
-  pub fn add(&mut self, name: &str) -> () {
-    self.dependencies.push(name.to_string())
+  // TODO check for duplicates
+  pub fn add_import(&mut self, name: &str) -> () {
+    self.dependencies.push(Dependency::Import(name.to_string(), 0));
+  }
+  pub fn add_export(&mut self, name: &str) -> () {
+    self.dependencies.push(Dependency::Export(name.to_string(), 0));
   }
 }
