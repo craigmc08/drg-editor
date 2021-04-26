@@ -105,7 +105,13 @@ impl ObjectImports {
     return Ok(&self.objects[index as usize]);
   }
 
-  pub fn add(&mut self, class_package: &str, class: &str, name: &str, idx: i32) -> i32 {
+  pub fn add(&mut self, class_package: &str, class: &str, name: &str, idx: i32) -> Option<i32> {
+    if self.serialized_index_of(name).is_some() {
+      // No-op if the object is already imported
+      // TODO what to do if different class_package/class/idx?
+      return None;
+    }
+    
     let object = ObjectImport {
       class_package: class_package.to_string(),
       class: class.to_string(),
@@ -114,7 +120,7 @@ impl ObjectImports {
     };
     let len = self.objects.len();
     self.objects.push(object);
-    return -(len as i32) - 1;
+    return Some(-(len as i32) - 1);
   }
 
   pub fn read_import(&self, rdr: &mut Cursor<Vec<u8>>, rep: &str) -> Result<String, String> {

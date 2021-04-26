@@ -98,7 +98,12 @@ impl NameMap {
     return Ok(&self.names[index as usize]);
   }
 
-  pub fn add(&mut self, name: &str) -> () {
+  pub fn add(&mut self, name: &str) -> bool {
+    // No-op if name already exists
+    if self.get_name_obj(name).is_some() {
+      return false;
+    }
+
     let index = self.names.len() as u64;
     let name_obj = Name {
       index,
@@ -106,7 +111,8 @@ impl NameMap {
       non_case_preserving_hash: 0,
       case_preserving_hash: 0,
     };
-    self.names.push(name_obj)
+    self.names.push(name_obj);
+    return true;
   }
 
   pub fn read_name(&self, rdr: &mut Cursor<Vec<u8>>, rep: &str) -> Result<String, String> {
