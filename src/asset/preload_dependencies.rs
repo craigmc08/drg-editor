@@ -4,6 +4,7 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub enum Dependency {
+  UObject,
   Import(String, u32),
   Export(String, u32),
 }
@@ -12,27 +13,30 @@ impl Dependency {
   pub fn read(rdr: &mut Cursor<Vec<u8>>, imports: &ObjectImports, exports: &ObjectExports) -> Result<Self, String> {
     let idx = read_u32(rdr);
     // If idx (as an i32) is negative
-    if (idx & 0x80000000) > 0 {
+    if idx == 0 {
+      Ok(Self::UObject)
+    } else if (idx & 0x80000000) > 0 {
       let import = imports.lookup(
         (std::u32::MAX - idx) as u64,
         &format!("PreloadDependency import @ {:04X}", rdr.position()),
       )?;
-      Ok(Dependency::Import(import.name.clone(), import.name_variant))
+      Ok(Self::Import(import.name.clone(), import.name_variant))
     } else {
       let export = exports.lookup(
         (idx - 1) as u64,
         &format!("PreloadDependency export @ {:04X}", rdr.position()),
       )?;
-      Ok(Dependency::Export(export.object_name.clone(), export.object_name_variant))
+      Ok(Self::Export(export.object_name.clone(), export.object_name_variant))
     }
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>, imports: &ObjectImports, exports: &ObjectExports) -> () {
     let dep_i = match self {
-      Dependency::Import(name, variant) => imports
+      Self::UObject => 0,
+      Self::Import(name, variant) => imports
         .serialized_index_of(name, *variant)
         .expect("Invalid PreloadDependency import name"),
-      Dependency::Export(name, variant) => exports
+      Self::Export(name, variant) => exports
         .serialized_index_of(name, *variant)
         .expect("Invalid PreloadDependency export name"),
     };

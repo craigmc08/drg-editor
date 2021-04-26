@@ -3,31 +3,205 @@ use crate::util::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::prelude::*;
 use std::io::Cursor;
+use std::convert::TryInto;
 
-#[derive(Debug)]
-pub enum PropertyValue {
-  BoolProperty {
-    value: bool,
-  },
-  ByteProperty {
-    value: u8,
-  },
+#[derive(Debug, Clone, Copy)]
+pub enum PropertyTag {
+  BoolProperty,
+  ByteProperty,
+  Int8Property,
+  Int16Property,
+  IntProperty,
+  Int64Property,
+  UInt16Property,
+  UInt32Property,
+  UInt64Property,
+  FloatProperty,
+  DoubleProperty,
   // EnumProperty, TODO
   // TextProperty, TODO
   // StrProperty, TODO
   // NameProperty, TODO
-  ArrayProperty {
-    value_tag: String,
-    value_tag_variant: u32,
-    values: Vec<PropertyValue>,
-  },
+  ArrayProperty,
   // MapProperty, TODO
-  ObjectProperty {
-    value: Dependency,
-  },
-  // StructProperty, TODO
+  ObjectProperty,
+  StructProperty,
   // DebugProperty, TODO
   // SetProperty, TODO
+  // WeakObjectProperty, TODO
+  // LazyObjectProperty, TODO
+  SoftObjectProperty,
+  // DelegateProperty, TODO
+  // MulticastDelegateProperty, TODO
+  // InterfaceProperty, TODO
+  // FieldPathProperty, TODO
+  // AssetObjectProperty, TODO
+}
+
+impl PropertyTag {
+  pub fn new(tag: &str) -> Result<Self, String> {
+    match tag {
+      "BoolProperty" => Ok(Self::BoolProperty),
+      "ByteProperty" => Ok(Self::ByteProperty),
+      "Int8Property" => Ok(Self::Int8Property),
+      "Int16Property" => Ok(Self::Int16Property),
+      "IntProperty" => Ok(Self::IntProperty),
+      "Int64Property" => Ok(Self::Int64Property),
+      "UInt16Property" => Ok(Self::UInt16Property),
+      "UInt32Property" => Ok(Self::UInt32Property),
+      "UInt64Property" => Ok(Self::UInt64Property),
+      "FloatProperty" => Ok(Self::FloatProperty),
+      "DoubleProperty" => Ok(Self::DoubleProperty),
+      "ArrayProperty" => Ok(Self::ArrayProperty),
+      "ObjectProperty" => Ok(Self::ObjectProperty),
+      "StructProperty" => Ok(Self::StructProperty),
+      "SoftObjectProperty" => Ok(Self::SoftObjectProperty),
+      _ => Err(format!("Unimplemented tag type {}", tag))
+    }
+  }
+
+  pub fn to_string(&self) -> &str {
+    match self {
+      Self::BoolProperty => "BoolProperty",
+      Self::ByteProperty => "ByteProperty",
+      Self::Int8Property => "Int8Property",
+      Self::Int16Property => "Int16Property",
+      Self::IntProperty => "IntProperty",
+      Self::Int64Property => "Int64Property",
+      Self::UInt16Property => "UInt16Property",
+      Self::UInt32Property => "UInt32Property",
+      Self::UInt64Property => "UInt64Property",
+      Self::FloatProperty => "FloatProperty",
+      Self::DoubleProperty => "DoubleProperty",
+      Self::ArrayProperty => "ArrayProperty",
+      Self::ObjectProperty => "ObjectProperty",
+      Self::StructProperty => "StructProperty",
+      Self::SoftObjectProperty => "SoftObjectProperty"
+    }
+  }
+
+  pub fn read(rdr: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<Self, String> {
+    let (tag, _) = names.read_name_with_variant(rdr, &format!("Property Tag @ #{:04X}", rdr.position()))?;
+    Self::new(tag.as_ref())
+  }
+
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> () {
+    names.write_name_with_variant(curs, self.to_string(), 0, "PropertyTag");
+  }
+
+  pub fn byte_size(&self) -> usize {
+    8
+  }
+}
+
+#[derive(Debug)]
+pub enum PropertyTagData {
+  EmptyTag { tag: PropertyTag },
+  BoolTag { value: bool },
+  ArrayTag { value_tag: PropertyTag },
+  StructTag { name: String, name_variant: u32, guid: [u8; 16] },
+}
+
+impl PropertyTagData {
+  // MUST be kept in sync with PropertyTag::is_complex_array_value
+  pub fn read(tag: PropertyTag, rdr: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<Self, String> {
+    let data = match tag {
+      PropertyTag::BoolProperty => {
+        Self::BoolTag { value: rdr.read_u8().unwrap() != 0 }
+      }
+      PropertyTag::ArrayProperty => {
+        Self::ArrayTag { value_tag: PropertyTag::read(rdr, names)? }
+      }
+      PropertyTag::StructProperty => {
+        let (name, name_variant) = names.read_name_with_variant(rdr, "StructTag.name")?;
+        let guid = read_bytes(rdr, 16)[0..16].try_into().unwrap();
+        Self::StructTag { name, name_variant, guid }
+      }
+      _ => Self::EmptyTag { tag }
+    };
+    rdr.consume(1); // eat the null-terminating byte after the tag data
+    Ok(data)
+  }
+
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> () {
+    match self {
+      Self::EmptyTag { .. } => {}
+      Self::BoolTag { value } => {
+        curs.write_u8(if *value { 1 } else { 0 }).unwrap();
+      }
+      Self::ArrayTag { value_tag } => {
+        value_tag.write(curs, names);
+      }
+      Self::StructTag { name, name_variant, guid } => {
+        names.write_name_with_variant(curs, name, *name_variant, "StructTag.name");
+      }
+    }
+    curs.write(&[0]); // write the null-terminating byte
+  }
+
+  // Includes the null-terminating byte
+  pub fn byte_size(&self) -> usize {
+    match self {
+      Self::EmptyTag { .. } => 1, // just padding
+      Self::BoolTag { .. } => 2, // u8 value + padding
+      Self::ArrayTag { value_tag } => value_tag.byte_size() + 1, // tag size + padding
+      Self::StructTag { .. } => 8 + 16 + 1, // name + guid[u8; 16] + padding
+    }
+  }
+}
+
+#[derive(Debug)]
+pub enum ArrayValue {
+  Simple { value: PropertyValue },
+  Complex { value: Property },
+}
+
+impl PropertyTag {
+  // This MUST be kept in-sync with PropertyTagData::read/write
+  pub fn is_complex_array_value(&self) -> bool {
+    // As far as I can tell, an array has a Complex value when it's value has
+    // a non-Empty PropertyTagData
+    match self {
+      Self::BoolProperty => true,
+      Self::ArrayProperty => true,
+      Self::StructProperty => true,
+      _ => false
+    }
+  }
+}
+
+impl ArrayValue {
+  pub fn read(tag: &PropertyTag, rdr: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> Result<Self, String> {
+    if tag.is_complex_array_value() {
+      Ok(Self::Complex { value: Property::read(rdr, names, imports, exports)?.unwrap() })
+    } else {
+      let tag_data = PropertyTagData::EmptyTag { tag: *tag };
+      // Size only matters for Complex types, at least for now
+      Ok(Self::Simple { value: PropertyValue::read(rdr, 0, &tag_data, names, imports, exports)? })
+    }
+  }
+
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> () {
+    match self {
+      Self::Complex { value } => value.write(curs, names, imports, exports),
+      Self::Simple { value } => value.write(curs, names, imports, exports)
+    }
+  }
+
+  pub fn byte_size(&self) -> usize {
+    match self {
+      Self::Simple { value } => value.byte_size(),
+      Self::Complex { value } => value.byte_size(),
+    }
+  }
+}
+
+#[derive(Debug)]
+pub enum PropertyValue {
+  BoolProperty { },
+  ByteProperty {
+    value: u8,
+  },
   Int8Property {
     value: i8,
   },
@@ -55,122 +229,94 @@ pub enum PropertyValue {
   DoubleProperty {
     value: f64,
   },
-  // WeakObjectProperty, TODO
-  // LazyObjectProperty, TODO
+  ArrayProperty {
+    values: Vec<ArrayValue>,
+  },
+  ObjectProperty {
+    value: Dependency,
+  },
+  StructProperty {
+    data: Vec<u8>
+  },
   SoftObjectProperty {
     object_name: String,
     object_name_variant: u32,
     unk1: u32,
   },
-  // DelegateProperty, TODO
-  // MulticastDelegateProperty, TODO
-  // InterfaceProperty, TODO
-  // FieldPathProperty, TODO
-  // AssetObjectProperty, TODO
-}
-
-#[derive(Debug)]
-pub struct Property {
-  pub name: String, // u632 index into name_map
-  pub name_variant: u32,
-  pub tag: String,  // u32 index into name map
-  pub tag_variant: u32,
-  // 1 byte of padding?
-  // 8 bytes for size
-  pub value: PropertyValue,
-}
-
-#[derive(Debug)]
-pub struct Struct {
-  pub properties: Vec<Property>,
-  pub extra: Vec<u8>, // extra unknown info after serial_size for export property
 }
 
 impl PropertyValue {
   fn read(
     rdr: &mut Cursor<Vec<u8>>,
-    tag: &str,
+    size: u64,
+    tag_data: &PropertyTagData,
     names: &NameMap,
     imports: &ObjectImports,
     exports: &ObjectExports,
   ) -> Result<Self, String> {
-    match tag {
-      "BoolProperty" => Ok(Self::BoolProperty {
-        value: read_bool(rdr),
-      }),
-      "ByteProperty" => Ok(Self::ByteProperty {
+    match tag_data {
+      PropertyTagData::EmptyTag { tag: PropertyTag::ByteProperty } => Ok(Self::ByteProperty {
         value: rdr.read_u8().unwrap(),
       }),
-      "ArrayProperty" => {
-        let (value_tag, value_tag_variant) = names.read_name_with_variant(rdr, "ArrayProperty value_tag")?;
-        rdr.consume(1); // padding is after value tag
-        let length = read_u32(rdr);
-        let mut values = vec![];
-        for _ in 0..length {
-          let value = Self::read(rdr, &value_tag, names, imports, exports)?;
-          values.push(value);
-        }
-        Ok(Self::ArrayProperty { value_tag, value_tag_variant, values })
-      }
-      "ObjectProperty" => {
+      PropertyTagData::EmptyTag { tag: PropertyTag::Int8Property } => Ok(Self::Int8Property {
+        value: rdr.read_i8().unwrap(),
+      }),
+      PropertyTagData::EmptyTag { tag: PropertyTag::Int16Property } => Ok(Self::Int16Property {
+        value: rdr.read_i16::<LittleEndian>().unwrap(),
+      }),
+      PropertyTagData::EmptyTag { tag: PropertyTag::IntProperty } => Ok(Self::IntProperty {
+        value: rdr.read_i32::<LittleEndian>().unwrap(),
+      }),
+      PropertyTagData::EmptyTag { tag: PropertyTag::Int64Property } => Ok(Self::Int64Property {
+        value: rdr.read_i64::<LittleEndian>().unwrap(),
+      }),
+      PropertyTagData::EmptyTag { tag: PropertyTag::UInt16Property } => Ok(Self::UInt16Property {
+        value: rdr.read_u16::<LittleEndian>().unwrap(),
+      }),
+      PropertyTagData::EmptyTag { tag: PropertyTag::UInt32Property } => Ok(Self::UInt32Property {
+        value: read_u32(rdr),
+      }),
+      PropertyTagData::EmptyTag { tag: PropertyTag::UInt64Property } => Ok(Self::UInt64Property {
+        value: rdr.read_u64::<LittleEndian>().unwrap(),
+      }),
+      PropertyTagData::EmptyTag { tag: PropertyTag::FloatProperty } => Ok(Self::FloatProperty {
+        value: rdr.read_f32::<LittleEndian>().unwrap(),
+      }),
+      PropertyTagData::EmptyTag { tag: PropertyTag::DoubleProperty } => Ok(Self::DoubleProperty {
+        value: rdr.read_f64::<LittleEndian>().unwrap(),
+      }),
+      PropertyTagData::EmptyTag { tag: PropertyTag::ObjectProperty } => {
         let value = Dependency::read(rdr, imports, exports)?;
         Ok(Self::ObjectProperty { value })
       }
-      "Int8Property" => Ok(Self::Int8Property {
-        value: rdr.read_i8().unwrap(),
-      }),
-      "Int16Property" => Ok(Self::Int16Property {
-        value: rdr.read_i16::<LittleEndian>().unwrap(),
-      }),
-      "IntProperty" => Ok(Self::IntProperty {
-        value: rdr.read_i32::<LittleEndian>().unwrap(),
-      }),
-      "Int64Property" => Ok(Self::Int64Property {
-        value: rdr.read_i64::<LittleEndian>().unwrap(),
-      }),
-      "UInt16Property" => Ok(Self::UInt16Property {
-        value: rdr.read_u16::<LittleEndian>().unwrap(),
-      }),
-      "UInt32Property" => Ok(Self::UInt32Property {
-        value: read_u32(rdr),
-      }),
-      "UInt64Property" => Ok(Self::UInt64Property {
-        value: rdr.read_u64::<LittleEndian>().unwrap(),
-      }),
-      "FloatProperty" => Ok(Self::FloatProperty {
-        value: rdr.read_f32::<LittleEndian>().unwrap(),
-      }),
-      "DoubleProperty" => Ok(Self::DoubleProperty {
-        value: rdr.read_f64::<LittleEndian>().unwrap(),
-      }),
-      "SoftObjectProperty" => {
+      PropertyTagData::EmptyTag { tag: PropertyTag::SoftObjectProperty } => {
         let (object_name, object_name_variant) = names.read_name_with_variant(rdr, "SoftObjectProperty object_name")?;
         let unk1 = read_u32(rdr);
         Ok(Self::SoftObjectProperty { object_name, object_name_variant, unk1 })
       }
-      _ => Err(format!("Unknown tag type {} at {:04X}", tag, rdr.position())),
+
+      PropertyTagData::EmptyTag { tag } => Err(format!("Illegal PropertyTagData object {:?}, report to maintainer", tag)),
+      
+      PropertyTagData::BoolTag { .. } => Ok(Self::BoolProperty {}),
+      PropertyTagData::ArrayTag { value_tag } => {
+        let length = read_u32(rdr);
+        let mut values = vec![];
+        for _ in 0..length {
+          let value = ArrayValue::read(value_tag, rdr, names, imports, exports)?;
+          values.push(value);
+        }
+        Ok(Self::ArrayProperty { values })
+      }
+      PropertyTagData::StructTag { .. } => {
+        let data = read_bytes(rdr, size as usize);
+        Ok(Self::StructProperty { data })
+      }
     }
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> () {
     match self {
-      Self::BoolProperty { value } => write_bool(curs, *value),
       Self::ByteProperty { value } => curs.write_u8(*value).unwrap(),
-      Self::ArrayProperty { value_tag, value_tag_variant, values } => {
-        let value_tag_n = names
-          .get_name_obj(value_tag)
-          .expect("Invalid ArrayProperty value_tag");
-        curs.write_u32::<LittleEndian>(value_tag_n.index).unwrap();
-        write_u32(curs, *value_tag_variant);
-        curs.write(&[0]).unwrap(); // weird padding
-        write_u32(curs, values.len() as u32);
-        for value in values.iter() {
-          value.write(curs, names, imports, exports);
-        }
-      }
-      Self::ObjectProperty { value } => {
-        value.write(curs, imports, exports);
-      }
       Self::Int8Property { value } => curs.write_i8(*value).unwrap(),
       Self::Int16Property { value } => curs.write_i16::<LittleEndian>(*value).unwrap(),
       Self::IntProperty { value } => curs.write_i32::<LittleEndian>(*value).unwrap(),
@@ -180,6 +326,9 @@ impl PropertyValue {
       Self::UInt64Property { value } => curs.write_u64::<LittleEndian>(*value).unwrap(),
       Self::FloatProperty { value } => curs.write_f32::<LittleEndian>(*value).unwrap(),
       Self::DoubleProperty { value } => curs.write_f64::<LittleEndian>(*value).unwrap(),
+      Self::ObjectProperty { value } => {
+        value.write(curs, imports, exports);
+      }
       Self::SoftObjectProperty { object_name, object_name_variant, unk1 } => {
         let object_name_n = names
           .get_name_obj(object_name)
@@ -188,18 +337,23 @@ impl PropertyValue {
         write_u32(curs, *object_name_variant);
         write_u32(curs, *unk1);
       }
+      Self::BoolProperty { } => { },
+      Self::ArrayProperty { values } => {
+        write_u32(curs, values.len() as u32);
+        for value in values.iter() {
+          value.write(curs, names, imports, exports);
+        }
+      }
+      Self::StructProperty { data } => {
+        curs.write(&data[..]).unwrap();
+      }
     }
   }
 
   pub fn byte_size(&self) -> usize {
     match self {
-      Self::BoolProperty { .. } => 4,
+      Self::BoolProperty { } => 0,
       Self::ByteProperty { .. } => 1,
-      Self::ArrayProperty { values, .. } => {
-        // value_tag index + u32 size = 12, values
-        12 + values.into_iter().map(|x| x.byte_size()).sum::<usize>()
-      }
-      Self::ObjectProperty { .. } => 4,
       Self::Int8Property { .. } => 1,
       Self::Int16Property { .. } => 2,
       Self::IntProperty { .. } => 4,
@@ -209,31 +363,26 @@ impl PropertyValue {
       Self::UInt64Property { .. } => 8,
       Self::FloatProperty { .. } => 4,
       Self::DoubleProperty { .. } => 8,
-      Self::SoftObjectProperty { .. } => 12,
-    }
-  }
-
-  pub fn value_size(&self) -> usize {
-    match self {
-      Self::BoolProperty { .. } => 4,
-      Self::ByteProperty { .. } => 1,
       Self::ArrayProperty { values, .. } => {
-        // u32 size = 4, values
+        // u32 size + values
         4 + values.into_iter().map(|x| x.byte_size()).sum::<usize>()
       }
       Self::ObjectProperty { .. } => 4,
-      Self::Int8Property { .. } => 1,
-      Self::Int16Property { .. } => 2,
-      Self::IntProperty { .. } => 4,
-      Self::Int64Property { .. } => 8,
-      Self::UInt16Property { .. } => 2,
-      Self::UInt32Property { .. } => 4,
-      Self::UInt64Property { .. } => 8,
-      Self::FloatProperty { .. } => 4,
-      Self::DoubleProperty { .. } => 8,
+      Self::StructProperty { data } => data.len(),
       Self::SoftObjectProperty { .. } => 12,
     }
   }
+}
+
+#[derive(Debug)]
+pub struct Property {
+  pub name: String, // u632 index into name_map
+  pub name_variant: u32,
+  pub tag: PropertyTag,
+  pub size: u64,
+  pub tag_data: PropertyTagData,
+  // 1 byte of padding?
+  pub value: PropertyValue,
 }
 
 impl Property {
@@ -248,13 +397,18 @@ impl Property {
       return Ok(None);
     }
 
-    let (tag, tag_variant) = names.read_name_with_variant(rdr, "Property tag")?;
-    let _size = rdr.read_u64::<LittleEndian>().unwrap();
-    if tag != "ArrayProperty" {
-      // This shouldn't happen for arrayproperties, because idk
-      rdr.consume(1); // weird 1 byte of padding for some reason
-    }
-    let value = PropertyValue::read(rdr, &tag, names, imports, exports)?;
+    let tag = PropertyTag::read(rdr, names)?;
+    let size = rdr.read_u64::<LittleEndian>().unwrap();
+
+    // Consume the byte of padding if the property type doesn't have it after some metadata
+    // TODO:
+    // The byte is a null-terminator after a list of properties for the tag
+    // So consume all of those names and pass them to PropertyValue::read along with tag
+
+    let tag_data = PropertyTagData::read(tag, rdr, names)?;
+
+    let value = PropertyValue::read(rdr, size, &tag_data, names, imports, exports)?;
+    // TODO: this can be uncommented after fixing the "padding byte"
     // if value.byte_size() != size.try_into().unwrap() {
     //   return Err(format!(
     //     "Property size {} does not match actual size {}",
@@ -266,25 +420,17 @@ impl Property {
       name,
       name_variant,
       tag,
-      tag_variant,
+      size,
+      tag_data,
       value,
     }));
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> () {
-    let name = names
-      .get_name_obj(&self.name)
-      .expect("Invalid Property name");
-    let tag = names.get_name_obj(&self.tag).expect("Invalid Property tag");
-    curs.write_u32::<LittleEndian>(name.index).unwrap();
-    write_u32(curs, self.name_variant);
-    curs.write_u32::<LittleEndian>(tag.index).unwrap();
-    write_u32(curs, self.tag_variant);
-    curs.write_u64::<LittleEndian>(self.value.value_size() as u64).unwrap();
-    if self.tag != "ArrayProperty" {
-      // See note in self.read, this is bad
-      curs.write(&[0]).unwrap();
-    }
+    names.write_name_with_variant(curs, &self.name, self.name_variant, "Property.name");
+    self.tag.write(curs, names);
+    curs.write_u64::<LittleEndian>(self.size).unwrap();
+    self.tag_data.write(curs, names);
     self.value.write(curs, names, imports, exports);
   }
 
@@ -292,6 +438,12 @@ impl Property {
     // 8 bytes each for name, tag, and size, 1 byte for random padding and obviously size bytes for the value
     25 + self.value.byte_size()
   }
+}
+
+#[derive(Debug)]
+pub struct Struct {
+  pub properties: Vec<Property>,
+  pub extra: Vec<u8>, // extra unknown info after serial_size for export property
 }
 
 impl Struct {

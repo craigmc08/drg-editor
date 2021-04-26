@@ -124,8 +124,14 @@ impl NameMap {
   }
 
   pub fn read_name_with_variant(&self, rdr: &mut Cursor<Vec<u8>>, rep: &str) -> Result<(String, u32), String> {
-    let name =self.read_name(rdr, rep)?;
+    let name = self.read_name(rdr, rep)?;
     let variant = read_u32(rdr);
     Ok((name, variant))
+  }
+
+  pub fn write_name_with_variant(&self, curs: &mut Cursor<Vec<u8>>, name: &str, variant: u32, rep: &str) -> () {
+    let name_n = self.get_name_obj(name).expect(&format!("Name {} for {} not in NameMap", name, rep));
+    write_u32(curs, name_n.index);
+    write_u32(curs, variant);
   }
 }
