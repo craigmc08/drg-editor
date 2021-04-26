@@ -1,67 +1,8 @@
-pub mod asset_registry;
-pub mod export_map;
-pub mod file_summary;
-pub mod name_map;
-pub mod object_imports;
-pub mod preload_dependencies;
-pub mod property;
 pub mod util;
+pub mod asset;
 
-use asset_registry::*;
-use export_map::*;
-use file_summary::*;
-use name_map::*;
-use object_imports::*;
-use preload_dependencies::*;
-use property::*;
+use asset::*;
 use std::env;
-use std::io::Cursor;
-
-fn recalculate_offsets(
-    summary: &mut FileSummary,
-    names: &NameMap,
-    imports: &ObjectImports,
-    exports: &mut ObjectExports,
-    assets: &AssetRegistry,
-    dependencies: &PreloadDependencies,
-    properties: &Vec<Property>,
-) {
-    summary.total_header_size = (summary.byte_size()
-        + names.byte_size()
-        + imports.byte_size()
-        + exports.byte_size()
-        + assets.byte_size()
-        + dependencies.byte_size()) as u32;
-    summary.name_count = names.names.len() as u32;
-    summary.name_offset = summary.byte_size() as u32;
-    summary.export_count = exports.exports.len() as u32;
-    summary.export_offset = (summary.byte_size() + names.byte_size() + imports.byte_size()) as u32;
-    summary.import_count = imports.objects.len() as u32;
-    summary.import_offset = (summary.byte_size() + names.byte_size()) as u32;
-    summary.depends_offset =
-        (summary.byte_size() + names.byte_size() + imports.byte_size() + exports.byte_size() - 4)
-            as u32;
-    summary.asset_registry_data_offset =
-        (summary.byte_size() + names.byte_size() + imports.byte_size() + exports.byte_size())
-            as u32;
-    summary.bulk_data_start_offset = (summary.byte_size()
-        + names.byte_size()
-        + imports.byte_size()
-        + exports.byte_size()
-        + assets.byte_size()
-        + dependencies.byte_size()
-        + Property::struct_size(properties)) as u32;
-    summary.preload_dependency_count = dependencies.dependencies.len() as u32;
-    summary.preload_dependency_offset = (summary.byte_size()
-        + names.byte_size()
-        + imports.byte_size()
-        + exports.byte_size()
-        + assets.byte_size()) as u32;
-
-    // TODO: do it for each export, not sure what that looks like though
-    exports.exports[0].serial_size = Property::struct_size(properties) as u64;
-    exports.exports[0].serial_offset = summary.total_header_size;
-}
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -82,77 +23,19 @@ fn main() {
             println!("{}", e);
         }
         Ok((uasset, uexp)) => {
-            let mut rdr = Cursor::new(uasset);
-            let summary = FileSummary::read(&mut rdr);
-            let names = NameMap::read(&mut rdr, &summary).unwrap();
-            let imports = ObjectImports::read(&mut rdr, &summary, &names).unwrap();
-            let exports = ObjectExports::read(&mut rdr, &summary, &names, &imports).unwrap();
-            let assets = AssetRegistry::read(&mut rdr, &summary).unwrap();
-            let dependencies = PreloadDependencies::read(&mut rdr, &summary, &imports).unwrap();
-            println!("{:#?}", summary);
-            println!("{:#?}", names);
-            println!("{:#?}", imports);
-            println!("{:#?}", exports);
-            println!("{:#?}", assets);
-            println!("{:#?}", dependencies);
+            let asset = Asset::read(uasset, uexp).unwrap();
+            println!("{:#?}", asset.summary);
+            println!("{:#?}", asset.names);
+            println!("{:#?}", asset.imports);
+            println!("{:#?}", asset.exports);
+            println!("{:#?}", asset.assets);
+            println!("{:#?}", asset.dependencies);
+            println!("{:#?}", asset.properties);
 
-            assert_eq!(summary.byte_size(), summary.name_offset as usize);
-            assert_eq!(
-                summary.byte_size() + names.byte_size(),
-                summary.import_offset as usize
-            );
-            assert_eq!(
-                summary.byte_size() + names.byte_size() + imports.byte_size(),
-                summary.export_offset as usize
-            );
-            assert_eq!(
-                summary.byte_size()
-                    + names.byte_size()
-                    + imports.byte_size()
-                    + exports.byte_size()
-                    + 4,
-                summary.asset_registry_data_offset as usize
-            );
-            assert_eq!(
-                summary.byte_size()
-                    + names.byte_size()
-                    + imports.byte_size()
-                    + exports.byte_size()
-                    + assets.byte_size()
-                    + dependencies.byte_size(),
-                summary.total_header_size as usize
-            );
+            let (uasset_out, uexp_out) = asset.write();
 
-            let mut rdruexp = Cursor::new(uexp);
-            let properties = Property::read_uexp(&mut rdruexp, &names, &imports).unwrap();
-            println!("{:#?}", properties);
-
-            assert_eq!(Property::struct_size(&properties), 591);
-
-            assert_eq!(
-                summary.byte_size()
-                    + names.byte_size()
-                    + imports.byte_size()
-                    + exports.byte_size()
-                    + assets.byte_size()
-                    + dependencies.byte_size()
-                    + Property::struct_size(&properties),
-                summary.bulk_data_start_offset as usize,
-            );
-
-            let mut curs_uasset = Cursor::new(vec!());
-            summary.write(&mut curs_uasset);
-            names.write(&mut curs_uasset);
-            imports.write(&mut curs_uasset, &names);
-            exports.write(&mut curs_uasset, &names, &imports);
-            assets.write(&mut curs_uasset);
-            dependencies.write(&mut curs_uasset, &imports);
-
-            let mut curs_uexp = Cursor::new(vec!());
-            Property::write_uexp(&properties, &mut curs_uexp, &summary, &names, &imports);
-
-            std::fs::write(format!("{}.out", uassetfp), curs_uasset.get_ref()).unwrap();
-            std::fs::write(format!("{}.out", uexpfp), curs_uexp.get_ref()).unwrap();
+            std::fs::write(format!("{}.out", uassetfp), uasset_out).unwrap();
+            std::fs::write(format!("{}.out", uexpfp), uexp_out).unwrap();
         }
     }
 }

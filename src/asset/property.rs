@@ -1,6 +1,4 @@
-use crate::file_summary::*;
-use crate::name_map::*;
-use crate::object_imports::*;
+use crate::asset::*;
 use crate::util::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::prelude::*;
@@ -249,7 +247,7 @@ impl Property {
     curs.write_u64::<LittleEndian>(self.size).unwrap();
     if self.tag != "ArrayProperty" {
       // See note in self.read, this is bad
-      curs.write(&[0]);
+      curs.write(&[0]).unwrap();
     }
     self.value.write(curs, names, imports);
   }
@@ -291,7 +289,7 @@ impl Property {
     write_u32(curs, 0);
 
     // Write ending tag
-    curs.write(&summary.tag);
+    curs.write(&summary.tag).unwrap();
   }
 
   pub fn byte_size(&self) -> usize {

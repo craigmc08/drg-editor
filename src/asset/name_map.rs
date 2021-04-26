@@ -1,4 +1,4 @@
-use crate::file_summary::*;
+use crate::asset::*;
 use crate::util::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
