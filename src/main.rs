@@ -75,7 +75,7 @@ fn main() {
     println!("Reading from {} and {}", uassetfp, uexpfp);
 
     match std::fs::read(uassetfp.clone()).and_then(|uasset| {
-        let uexp = std::fs::read(uexpfp)?;
+        let uexp = std::fs::read(uexpfp.clone())?;
         Ok((uasset, uexp))
     }) {
         Err(e) => {
@@ -148,7 +148,11 @@ fn main() {
             assets.write(&mut curs_uasset);
             dependencies.write(&mut curs_uasset, &imports);
 
+            let mut curs_uexp = Cursor::new(vec!());
+            Property::write_uexp(&properties, &mut curs_uexp, &summary, &names, &imports);
+
             std::fs::write(format!("{}.out", uassetfp), curs_uasset.get_ref()).unwrap();
+            std::fs::write(format!("{}.out", uexpfp), curs_uexp.get_ref()).unwrap();
         }
     }
 }
