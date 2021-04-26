@@ -134,9 +134,10 @@ impl PropertyTagData {
       }
       Self::StructTag { name, name_variant, guid } => {
         names.write_name_with_variant(curs, name, *name_variant, "StructTag.name");
+        curs.write(guid).unwrap();
       }
     }
-    curs.write(&[0]); // write the null-terminating byte
+    curs.write(&[0]).unwrap(); // write the null-terminating byte
   }
 
   // Includes the null-terminating byte
@@ -394,6 +395,7 @@ impl Property {
   ) -> Result<Option<Self>, String> {
     let (name, name_variant) = names.read_name_with_variant(rdr, "Property name")?;
     if &name == "None" {
+      rdr.consume(4); // there are 4 more bytes after None name to consume
       return Ok(None);
     }
 

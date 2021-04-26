@@ -16,7 +16,6 @@ pub use property::*;
 
 use std::io::Cursor;
 use std::io::prelude::Write;
-use crate::util::*;
 
 pub struct Asset {
   pub summary: FileSummary,
@@ -70,7 +69,7 @@ impl Asset {
     for strct in self.structs.iter() {
       strct.write(&mut cursor_uexp, &self.names, &self.imports, &self.exports);
     }
-    cursor_uexp.write(&self.summary.tag);
+    cursor_uexp.write(&self.summary.tag).unwrap();
 
     return (cursor_uasset.get_ref().clone(), cursor_uexp.get_ref().clone())
   }
