@@ -12,6 +12,9 @@ pub fn read_u32(rdr: &mut Cursor<Vec<u8>>) -> u32 {
   rdr.read_u32::<LittleEndian>().unwrap()
 }
 
+/**
+ * Reads a length-prefixed, null-terminated string
+ */
 pub fn read_string(rdr: &mut Cursor<Vec<u8>>) -> String {
   let length = read_u32(rdr) as usize;
   let chars = read_bytes(rdr, length - 1);

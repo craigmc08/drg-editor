@@ -18,11 +18,11 @@ pub enum PropertyTag {
   UInt64Property,
   FloatProperty,
   DoubleProperty,
+  TextProperty,
+  // StrProperty, TODO
+  NameProperty,
 
   EnumProperty,
-  // TextProperty, TODO
-  // StrProperty, TODO
-  // NameProperty, TODO
   ArrayProperty,
   // MapProperty, TODO
   ObjectProperty,
@@ -53,6 +53,8 @@ impl PropertyTag {
       "UInt64Property" => Ok(Self::UInt64Property),
       "FloatProperty" => Ok(Self::FloatProperty),
       "DoubleProperty" => Ok(Self::DoubleProperty),
+      "TextProperty" => Ok(Self::TextProperty),
+      "NameProperty" => Ok(Self::NameProperty),
       "EnumProperty" => Ok(Self::EnumProperty),
       "ArrayProperty" => Ok(Self::ArrayProperty),
       "ObjectProperty" => Ok(Self::ObjectProperty),
@@ -75,6 +77,8 @@ impl PropertyTag {
       Self::UInt64Property => "UInt64Property",
       Self::FloatProperty => "FloatProperty",
       Self::DoubleProperty => "DoubleProperty",
+      Self::TextProperty => "TextProperty",
+      Self::NameProperty => "NameProperty",
       Self::EnumProperty => "EnumProperty",
       Self::ArrayProperty => "ArrayProperty",
       Self::ObjectProperty => "ObjectProperty",
@@ -242,6 +246,14 @@ pub enum PropertyValue {
   DoubleProperty {
     value: f64,
   },
+  TextProperty {
+    bytes: [u8; 13], // TODO this might be wrong
+    value: String,
+  },
+  NameProperty {
+    name: String,
+    name_variant: u32,
+  },
   EnumProperty {
     value: String,
     value_variant: u32,
@@ -302,6 +314,15 @@ impl PropertyValue {
       PropertyTagData::EmptyTag { tag: PropertyTag::DoubleProperty } => Ok(Self::DoubleProperty {
         value: rdr.read_f64::<LittleEndian>().unwrap(),
       }),
+      PropertyTagData::EmptyTag { tag: PropertyTag::TextProperty } => {
+        let bytes = read_bytes(rdr, 13); // TODO
+        let value = read_string(rdr);
+        Ok(Self::TextProperty { bytes: bytes[..].try_into().unwrap(), value })
+      }
+      PropertyTagData::EmptyTag { tag: PropertyTag::NameProperty } => {
+        let (name, name_variant) = names.read_name_with_variant(rdr, "NameProperty.name")?;
+        Ok(Self::NameProperty { name, name_variant })
+      }
       PropertyTagData::EmptyTag { tag: PropertyTag::ObjectProperty } => {
         let value = Dependency::read(rdr, imports, exports)?;
         Ok(Self::ObjectProperty { value })
@@ -347,6 +368,13 @@ impl PropertyValue {
       Self::UInt64Property { value } => curs.write_u64::<LittleEndian>(*value).unwrap(),
       Self::FloatProperty { value } => curs.write_f32::<LittleEndian>(*value).unwrap(),
       Self::DoubleProperty { value } => curs.write_f64::<LittleEndian>(*value).unwrap(),
+      Self::TextProperty { bytes, value } => {
+        curs.write(bytes);
+        write_string(curs, value);
+      }
+      Self::NameProperty { name, name_variant } => {
+        names.write_name_with_variant(curs, name, *name_variant, "NameProperty.name");
+      }
       Self::ObjectProperty { value } => {
         value.write(curs, imports, exports);
       }
@@ -388,6 +416,11 @@ impl PropertyValue {
       Self::FloatProperty { .. } => 4,
       Self::DoubleProperty { .. } => 8,
       Self::EnumProperty { .. } => 8,
+      Self::TextProperty { bytes, value } => {
+        // bytes + length + string value + null terminator
+        bytes.len() + 4 + value.len() + 1
+      }
+      Self::NameProperty { .. } => 8,
       Self::ArrayProperty { values, .. } => {
         // u32 size + values
         4 + values.into_iter().map(|x| x.byte_size()).sum::<usize>()
