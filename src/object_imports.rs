@@ -1,6 +1,6 @@
 use crate::file_summary::*;
 use crate::name_map::*;
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 
 #[derive(Debug)]
@@ -29,6 +29,22 @@ impl ObjectImport {
       name,
     });
   }
+
+  fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> () {
+    let cpkg = names
+      .get_name_obj(&self.class_package)
+      .expect("Invalid ObjectImport class_package");
+    let class = names
+      .get_name_obj(&self.class)
+      .expect("Invalid ObjectImport class");
+    let name = names
+      .get_name_obj(&self.name)
+      .expect("Invalid ObjectImport name");
+    curs.write_u64::<LittleEndian>(cpkg.index).unwrap();
+    curs.write_u64::<LittleEndian>(class.index).unwrap();
+    curs.write_i32::<LittleEndian>(self.outer_index).unwrap();
+    curs.write_u64::<LittleEndian>(name.index).unwrap();
+  }
 }
 
 impl ObjectImports {
@@ -56,9 +72,26 @@ impl ObjectImports {
     return Ok(ObjectImports { objects });
   }
 
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) {
+    for object in self.objects.iter() {
+      object.write(curs, names);
+    }
+  }
+
   pub fn byte_size(&self) -> usize {
     // Each ObjectImport is 28 bytes long
     28 * self.objects.len()
+  }
+
+  pub fn serialized_index_of(&self, object: &str) -> Option<u32> {
+    let mut i: u32 = 0;
+    for import in self.objects.iter() {
+      if import.name == object {
+        return Some(std::u32::MAX - i);
+      }
+      i += 1;
+    }
+    return None
   }
 
   pub fn lookup(&self, index: u64, rep: &str) -> Result<&ObjectImport, String> {

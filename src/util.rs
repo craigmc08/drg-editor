@@ -1,4 +1,4 @@
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::prelude::*;
 use std::io::Cursor;
 
@@ -23,11 +23,17 @@ pub fn read_bool(rdr: &mut Cursor<Vec<u8>>) -> bool {
   read_u32(rdr) != 0
 }
 
-pub fn peek_bytes(rdr: &mut Cursor<Vec<u8>>, len: usize) -> Vec<u8> {
-  let mut buf = vec!();
-  for _ in 0..len {
-    let byte = *rdr.get_mut().iter().next().unwrap();
-    buf.push(byte)
-  }
-  buf.to_vec()
+pub fn write_u32(curs: &mut Cursor<Vec<u8>>, val: u32) -> () {
+  curs.write_u32::<LittleEndian>(val).unwrap();
+}
+
+pub fn write_string(curs: &mut Cursor<Vec<u8>>, string: &str) -> () {
+  let length = string.len() + 1;
+  write_u32(curs, length as u32);
+  curs.write(string.as_bytes()).unwrap();
+  curs.write(&[0]).unwrap();
+}
+
+pub fn write_bool(curs: &mut Cursor<Vec<u8>>, val: bool) -> () {
+  write_u32(curs, if val { 1 } else { 0 });
 }

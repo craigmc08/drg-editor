@@ -1,6 +1,7 @@
 use crate::util::*;
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::convert::TryInto;
+use std::io::prelude::*;
 use std::io::Cursor;
 
 #[derive(Debug)]
@@ -68,6 +69,11 @@ impl Generation {
     }
   }
 
+  fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
+    write_u32(curs, self.export_count);
+    write_u32(curs, self.name_count);
+  }
+
   fn read_array(rdr: &mut Cursor<Vec<u8>>) -> Vec<Generation> {
     let length = read_u32(rdr);
     let mut generations: Vec<Generation> = vec![];
@@ -75,6 +81,13 @@ impl Generation {
       generations.push(Self::read(rdr));
     }
     return generations;
+  }
+
+  fn write_array(gens: &Vec<Generation>, curs: &mut Cursor<Vec<u8>>) -> () {
+    write_u32(curs, gens.len() as u32);
+    for i in 0..gens.len() {
+      gens[i].write(curs);
+    }
   }
 }
 
@@ -148,6 +161,41 @@ impl FileSummary {
       preload_dependency_count,
       preload_dependency_offset,
     };
+  }
+
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
+    curs.write(&self.tag).unwrap();
+    write_u32(curs, self.file_version_ue4);
+    write_u32(curs, self.file_version_license_ue4);
+    curs.write(&self.custom_version).unwrap();
+    write_u32(curs, self.total_header_size);
+    write_string(curs, &self.folder_name);
+    write_u32(curs, self.package_flags);
+    write_u32(curs, self.name_count);
+    write_u32(curs, self.name_offset);
+    write_u32(curs, self.gatherable_text_data_count);
+    write_u32(curs, self.gatherable_text_data_offset);
+    write_u32(curs, self.export_count);
+    write_u32(curs, self.export_offset);
+    write_u32(curs, self.import_count);
+    write_u32(curs, self.import_offset);
+    write_u32(curs, self.depends_offset);
+    write_u32(curs, self.soft_package_references_count);
+    write_u32(curs, self.soft_package_references_offset);
+    write_u32(curs, self.searchable_names_offset);
+    write_u32(curs, self.thumbnail_table_offset);
+    curs.write(&self.guid).unwrap();
+    Generation::write_array(&self.generations, curs);
+    curs.write(&self.saved_by_engine_version).unwrap();
+    curs.write(&self.compatible_with_engine_version).unwrap();
+    write_u32(curs, self.compression_flags);
+    curs.write_i64::<LittleEndian>(self.package_source).unwrap();
+    write_u32(curs, self.asset_registry_data_offset);
+    write_u32(curs, self.bulk_data_start_offset);
+    write_u32(curs, self.world_tile_info_data_offset);
+    curs.write_u64::<LittleEndian>(self.chunk_ids).unwrap();
+    write_u32(curs, self.preload_dependency_count);
+    write_u32(curs, self.preload_dependency_offset);
   }
 
   pub fn byte_size(&self) -> usize {

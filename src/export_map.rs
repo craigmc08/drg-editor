@@ -2,8 +2,9 @@ use crate::file_summary::*;
 use crate::name_map::*;
 use crate::object_imports::*;
 use crate::util::*;
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::convert::TryInto;
+use std::io::prelude::*;
 use std::io::Cursor;
 
 #[derive(Debug)]
@@ -47,7 +48,9 @@ impl ObjectExport {
     let super_index = rdr.read_i32::<LittleEndian>().unwrap();
     let template = imports.read_import(rdr, "template")?;
     let outer = rdr.read_i32::<LittleEndian>().unwrap();
-    let object_name = names.lookup(read_u32(rdr).into(), "object_name").map(|x| x.name.clone())?;
+    let object_name = names
+      .lookup(read_u32(rdr).into(), "object_name")
+      .map(|x| x.name.clone())?;
     let object_flags = rdr.read_u64::<LittleEndian>().unwrap();
     let serial_size = rdr.read_u64::<LittleEndian>().unwrap();
     let serial_offset = read_u32(rdr);
@@ -89,6 +92,40 @@ impl ObjectExport {
       create_before_create_dependencies,
     });
   }
+
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports) -> () {
+    let class_i = imports
+      .serialized_index_of(&self.class)
+      .expect("Invalid ObjectExport class");
+    let template_i = imports
+      .serialized_index_of(&self.template)
+      .expect("Invalid ObjectExport template");
+    let object_name = names
+      .get_name_obj(&self.object_name)
+      .expect("Invalid ObjectExport object_name");
+
+    write_u32(curs, class_i);
+    curs.write_i32::<LittleEndian>(self.super_index).unwrap();
+    write_u32(curs, template_i);
+    curs.write_i32::<LittleEndian>(self.outer).unwrap();
+    write_u32(curs, object_name.index as u32);
+    curs.write_u64::<LittleEndian>(self.object_flags).unwrap();
+    curs.write_u64::<LittleEndian>(self.serial_size).unwrap();
+    write_u32(curs, self.serial_offset);
+    write_u32(curs, self.export_file_offset);
+    write_bool(curs, self.forced_export);
+    write_bool(curs, self.not_for_client);
+    write_bool(curs, self.not_for_server);
+    write_bool(curs, self.was_filtered);
+    curs.write(&self.package_guid).unwrap();
+    write_bool(curs, self.not_always_loaded_for_editor_game);
+    write_bool(curs, self.is_asset);
+    write_u32(curs, self.first_export_dependency);
+    write_u32(curs, self.serialization_before_serialization_dependencies);
+    write_u32(curs, self.create_before_serialization_dependencies);
+    write_u32(curs, self.serialization_before_create_dependencies);
+    write_u32(curs, self.create_before_create_dependencies);
+  }
 }
 
 impl ObjectExports {
@@ -115,6 +152,12 @@ impl ObjectExports {
       exports.push(object);
     }
     return Ok(ObjectExports { exports });
+  }
+
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports) -> () {
+    for export in self.exports.iter() {
+      export.write(curs, names, imports);
+    }
   }
 
   pub fn byte_size(&self) -> usize {

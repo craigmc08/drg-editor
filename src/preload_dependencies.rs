@@ -1,5 +1,6 @@
 use crate::file_summary::*;
 use crate::object_imports::*;
+use crate::util::*;
 use std::io::Cursor;
 
 #[derive(Debug)]
@@ -32,6 +33,13 @@ impl PreloadDependencies {
     }
 
     return Ok(PreloadDependencies { dependencies });
+  }
+
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, imports: &ObjectImports) -> () {
+    for dep in self.dependencies.iter() {
+      let dep_i = imports.serialized_index_of(dep).expect("Invalid PreloadDependency name");
+      write_u32(curs, dep_i);
+    }
   }
 
   pub fn byte_size(&self) -> usize {

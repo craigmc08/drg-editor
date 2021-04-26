@@ -57,6 +57,8 @@ fn recalculate_offsets(
         + imports.byte_size()
         + exports.byte_size()
         + assets.byte_size()) as u32;
+
+    // TODO: do it for each export, not sure what that looks like though
     exports.exports[0].serial_size = Property::struct_size(properties) as u64;
     exports.exports[0].serial_offset = summary.total_header_size;
 }
@@ -72,7 +74,7 @@ fn main() {
     let uexpfp = format!("{}.uexp", args[1]);
     println!("Reading from {} and {}", uassetfp, uexpfp);
 
-    match std::fs::read(uassetfp).and_then(|uasset| {
+    match std::fs::read(uassetfp.clone()).and_then(|uasset| {
         let uexp = std::fs::read(uexpfp)?;
         Ok((uasset, uexp))
     }) {
@@ -137,6 +139,16 @@ fn main() {
                     + Property::struct_size(&properties),
                 summary.bulk_data_start_offset as usize,
             );
+
+            let mut curs_uasset = Cursor::new(vec!());
+            summary.write(&mut curs_uasset);
+            names.write(&mut curs_uasset);
+            imports.write(&mut curs_uasset, &names);
+            exports.write(&mut curs_uasset, &names, &imports);
+            assets.write(&mut curs_uasset);
+            dependencies.write(&mut curs_uasset, &imports);
+
+            std::fs::write(format!("{}.out", uassetfp), curs_uasset.get_ref()).unwrap();
         }
     }
 }

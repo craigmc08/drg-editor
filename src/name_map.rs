@@ -1,6 +1,6 @@
 use crate::file_summary::*;
 use crate::util::*;
-use byteorder::{LittleEndian, ReadBytesExt};
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 
 #[derive(Debug)]
@@ -28,6 +28,16 @@ impl Name {
       case_preserving_hash,
     };
   }
+
+  fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
+    write_string(curs, &self.name);
+    curs
+      .write_u16::<LittleEndian>(self.non_case_preserving_hash)
+      .unwrap();
+    curs
+      .write_u16::<LittleEndian>(self.case_preserving_hash)
+      .unwrap();
+  }
 }
 
 impl NameMap {
@@ -52,13 +62,28 @@ impl NameMap {
     return Ok(NameMap { names });
   }
 
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
+    for name in self.names.iter() {
+      name.write(curs);
+    }
+  }
+
   pub fn byte_size(&self) -> usize {
     // Size of each is 8 + (len(name) + 1)
     let mut size = 0;
     for name in self.names.iter() {
       size += 8 + name.name.len() + 1;
     }
-    return size
+    return size;
+  }
+
+  pub fn get_name_obj(&self, name: &str) -> Option<&Name> {
+    for own_name in self.names.iter() {
+      if own_name.name == name {
+        return Some(own_name);
+      }
+    }
+    return None;
   }
 
   pub fn lookup(&self, index: u64, rep: &str) -> Result<&Name, String> {
