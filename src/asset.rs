@@ -16,6 +16,7 @@ pub use property::*;
 
 use std::io::Cursor;
 use std::io::prelude::Write;
+use std::path::{Path, PathBuf};
 
 pub struct Asset {
   pub summary: FileSummary,
@@ -28,6 +29,28 @@ pub struct Asset {
 }
 
 impl Asset {
+  pub fn read_from(asset_loc: &Path) -> Self {
+    let uasset_fp = asset_loc.with_extension("uasset");
+    let uexp_fp = asset_loc.with_extension("uexp");
+
+    let uasset = std::fs::read(uasset_fp).unwrap();
+    let uexp = std::fs::read(uexp_fp).unwrap();
+
+    Self::read(uasset, uexp)
+  }
+
+  pub fn write_out(&self, asset_loc: &Path) -> () {
+    let (uasset, uexp) = self.write();
+
+    let mut out_loc = PathBuf::from("out\\");
+    out_loc.push(asset_loc.file_name().unwrap());
+    let uasset_fp = out_loc.with_extension("uasset");
+    let uexp_fp = out_loc.with_extension("uexp");
+
+    std::fs::write(uasset_fp, uasset).unwrap();
+    std::fs::write(uexp_fp, uexp).unwrap();
+  }
+
   pub fn read(uasset: Vec<u8>, uexp: Vec<u8>) -> Self {
     let mut cursor_uasset = Cursor::new(uasset);
     let summary = FileSummary::read(&mut cursor_uasset);
