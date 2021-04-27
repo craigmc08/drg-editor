@@ -1,5 +1,5 @@
 pub mod asset;
-pub mod editor;
+pub mod bindings;
 pub mod util;
 
 use asset::*;

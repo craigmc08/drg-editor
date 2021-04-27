@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 byteorder = "1.4.3"
+nuklear-rust = "0.6.3"

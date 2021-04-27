@@ -145,8 +145,13 @@ impl Asset {
     }
   }
 
-  /// List the names of all exported Structs
-  pub fn list_structs(&self) -> Vec<String> {
+  // List all imports
+  pub fn list_imports(&self) -> &Vec<ObjectImport> {
+    &self.imports.objects
+  }
+
+  /// List the names of all exports
+  pub fn list_exports(&self) -> Vec<String> {
     self
       .exports
       .exports
