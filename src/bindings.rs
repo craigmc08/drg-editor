@@ -193,6 +193,13 @@ impl Asset {
 // TRAIT IMPLEMENTATIONS
 //======================
 
+// TODO can't implement tag for Property: AsProperty
+impl FromProperty for Property {
+  fn from_property(property: &Property) -> Option<Self> {
+    Some(property.clone())
+  }
+}
+
 impl AsProperty for bool {
   fn tag() -> PropertyTag {
     PropertyTag::BoolProperty
