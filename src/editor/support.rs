@@ -60,7 +60,7 @@ pub fn init(title: &str) -> System {
 }
 
 impl System {
-  pub fn main_loop<F: FnMut(&mut bool, &mut Ui) + 'static>(self, mut run_ui: F) {
+  pub fn main_loop<F: FnMut((u32, u32), &mut bool, &mut Ui) + 'static>(self, mut run_ui: F) {
     let System {
       event_loop,
       display,
@@ -87,15 +87,16 @@ impl System {
       Event::RedrawRequested(_) => {
         let mut ui = imgui.frame();
 
+        let dimensions = display.get_framebuffer_dimensions();
         let mut run = true;
-        run_ui(&mut run, &mut ui);
+        run_ui(dimensions, &mut run, &mut ui);
         if !run {
           *control_flow = ControlFlow::Exit;
         }
 
         let gl_window = display.gl_window();
         let mut target = display.draw();
-        target.clear_color_srgb(1.0, 1.0, 1.0, 1.0);
+        target.clear_color_srgb(0.0, 0.0, 0.0, 1.0);
         platform.prepare_render(&ui, gl_window.window());
         let draw_data = ui.render();
         renderer

@@ -1,5 +1,6 @@
 use crate::asset::*;
 use crate::util::*;
+use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Cursor;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -33,31 +34,50 @@ impl Dependency {
     }
   }
 
-  pub fn read(
-    rdr: &mut Cursor<Vec<u8>>,
+  pub fn deserialize(
+    idx: i32,
     imports: &ObjectImports,
     exports: &ObjectExports,
   ) -> Result<Self, String> {
-    let idx = read_u32(rdr);
-    // If idx (as an i32) is negative
     if idx == 0 {
       Ok(Self::UObject)
-    } else if (idx & 0x80000000) > 0 {
-      let import = imports.lookup(
-        (std::u32::MAX - idx) as u64,
-        &format!("PreloadDependency import @ {:04X}", rdr.position()),
-      )?;
+    } else if idx < 0 {
+      let import = imports.lookup((-idx - 1) as u64, "Dependency::deserialize")?;
       Ok(Self::Import(import.name.clone(), import.name_variant))
     } else {
-      let export = exports.lookup(
-        (idx - 1) as u64,
-        &format!("PreloadDependency export @ {:04X}", rdr.position()),
-      )?;
+      let export = exports.lookup((idx - 1) as u64, "Dependency::deserialize")?;
       Ok(Self::Export(
         export.object_name.clone(),
         export.object_name_variant,
       ))
     }
+  }
+
+  pub fn read(
+    rdr: &mut Cursor<Vec<u8>>,
+    imports: &ObjectImports,
+    exports: &ObjectExports,
+  ) -> Result<Self, String> {
+    let idx = rdr.read_i32::<LittleEndian>().unwrap();
+    Self::deserialize(idx, imports, exports)
+    // if idx == 0 {
+    //   Ok(Self::UObject)
+    // } else if (idx & 0x80000000) > 0 {
+    //   let import = imports.lookup(
+    //     (std::u32::MAX - idx) as u64,
+    //     &format!("PreloadDependency import @ {:04X}", rdr.position()),
+    //   )?;
+    //   Ok(Self::Import(import.name.clone(), import.name_variant))
+    // } else {
+    //   let export = exports.lookup(
+    //     (idx - 1) as u64,
+    //     &format!("PreloadDependency export @ {:04X}", rdr.position()),
+    //   )?;
+    //   Ok(Self::Export(
+    //     export.object_name.clone(),
+    //     export.object_name_variant,
+    //   ))
+    // }
   }
 
   pub fn write(

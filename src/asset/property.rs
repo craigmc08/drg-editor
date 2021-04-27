@@ -233,6 +233,25 @@ impl PropertyTag {
 }
 
 impl NestedValue {
+  /// Create a NestedValue with some default values for a specific tag.
+  ///
+  /// # Panics
+  ///
+  /// Panics if the tag is a complex tag.
+  pub fn new(tag: PropertyTag) -> Self {
+    if tag.is_complex_array_value() {
+      panic!()
+    }
+
+    match tag {
+      PropertyTag::ObjectProperty => NestedValue::Simple {
+        value: PropertyValue::ObjectProperty {
+          value: Dependency::uobject(),
+        },
+      },
+      _ => unimplemented!(),
+    }
+  }
   pub fn read(
     tag: &PropertyTag,
     rdr: &mut Cursor<Vec<u8>>,
@@ -581,6 +600,30 @@ impl PropertyValue {
       Self::ObjectProperty { .. } => 4,
       Self::StructProperty { data } => data.len(),
       Self::SoftObjectProperty { .. } => 12,
+    }
+  }
+
+  pub fn tag(&self) -> PropertyTag {
+    match self {
+      Self::BoolProperty { .. } => PropertyTag::BoolProperty,
+      Self::ByteProperty { .. } => PropertyTag::ByteProperty,
+      Self::Int8Property { .. } => PropertyTag::Int8Property,
+      Self::Int16Property { .. } => PropertyTag::Int16Property,
+      Self::IntProperty { .. } => PropertyTag::IntProperty,
+      Self::Int64Property { .. } => PropertyTag::Int64Property,
+      Self::UInt16Property { .. } => PropertyTag::UInt16Property,
+      Self::UInt32Property { .. } => PropertyTag::UInt32Property,
+      Self::UInt64Property { .. } => PropertyTag::UInt64Property,
+      Self::FloatProperty { .. } => PropertyTag::FloatProperty,
+      Self::DoubleProperty { .. } => PropertyTag::DoubleProperty,
+      Self::TextProperty { .. } => PropertyTag::TextProperty,
+      Self::NameProperty { .. } => PropertyTag::NameProperty,
+      Self::EnumProperty { .. } => PropertyTag::EnumProperty,
+      Self::ArrayProperty { .. } => PropertyTag::ArrayProperty,
+      Self::MapProperty { .. } => PropertyTag::MapProperty,
+      Self::ObjectProperty { .. } => PropertyTag::ObjectProperty,
+      Self::StructProperty { .. } => PropertyTag::StructProperty,
+      Self::SoftObjectProperty { .. } => PropertyTag::SoftObjectProperty,
     }
   }
 }
