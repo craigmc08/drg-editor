@@ -1,10 +1,10 @@
 use crate::asset::*;
 use crate::util::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::io::prelude::*;
-use std::io::{Seek, SeekFrom};
-use std::io::Cursor;
 use std::convert::TryInto;
+use std::io::prelude::*;
+use std::io::Cursor;
+use std::io::{Seek, SeekFrom};
 
 #[derive(Debug, Clone, Copy)]
 pub enum PropertyTag {
@@ -62,7 +62,7 @@ impl PropertyTag {
       "ObjectProperty" => Ok(Self::ObjectProperty),
       "StructProperty" => Ok(Self::StructProperty),
       "SoftObjectProperty" => Ok(Self::SoftObjectProperty),
-      _ => Err(format!("Unimplemented tag type {}", tag))
+      _ => Err(format!("Unimplemented tag type {}", tag)),
     }
   }
 
@@ -86,12 +86,13 @@ impl PropertyTag {
       Self::MapProperty => "MapProperty",
       Self::ObjectProperty => "ObjectProperty",
       Self::StructProperty => "StructProperty",
-      Self::SoftObjectProperty => "SoftObjectProperty"
+      Self::SoftObjectProperty => "SoftObjectProperty",
     }
   }
 
   pub fn read(rdr: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<Self, String> {
-    let (tag, _) = names.read_name_with_variant(rdr, &format!("Property Tag @ #{:04X}", rdr.position()))?;
+    let (tag, _) =
+      names.read_name_with_variant(rdr, &format!("Property Tag @ #{:04X}", rdr.position()))?;
     Self::new(tag.as_ref())
   }
 
@@ -106,28 +107,48 @@ impl PropertyTag {
 
 #[derive(Debug, Clone)]
 pub enum PropertyTagData {
-  EmptyTag { tag: PropertyTag },
-  BoolTag { value: bool },
-  EnumTag { name: String, name_variant: u32 },
-  ArrayTag { value_tag: PropertyTag },
-  MapTag { key_tag: PropertyTag, value_tag: PropertyTag },
-  StructTag { name: String, name_variant: u32, guid: [u8; 16] },
+  EmptyTag {
+    tag: PropertyTag,
+  },
+  BoolTag {
+    value: bool,
+  },
+  EnumTag {
+    name: String,
+    name_variant: u32,
+  },
+  ArrayTag {
+    value_tag: PropertyTag,
+  },
+  MapTag {
+    key_tag: PropertyTag,
+    value_tag: PropertyTag,
+  },
+  StructTag {
+    name: String,
+    name_variant: u32,
+    guid: [u8; 16],
+  },
 }
 
 impl PropertyTagData {
   // MUST be kept in sync with PropertyTag::is_complex_array_value
-  pub fn read(tag: PropertyTag, rdr: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<Self, String> {
+  pub fn read(
+    tag: PropertyTag,
+    rdr: &mut Cursor<Vec<u8>>,
+    names: &NameMap,
+  ) -> Result<Self, String> {
     let data = match tag {
-      PropertyTag::BoolProperty => {
-        Self::BoolTag { value: rdr.read_u8().unwrap() != 0 }
-      }
+      PropertyTag::BoolProperty => Self::BoolTag {
+        value: rdr.read_u8().unwrap() != 0,
+      },
       PropertyTag::EnumProperty => {
         let (name, name_variant) = names.read_name_with_variant(rdr, "EnumTag.name")?;
         Self::EnumTag { name, name_variant }
       }
-      PropertyTag::ArrayProperty => {
-        Self::ArrayTag { value_tag: PropertyTag::read(rdr, names)? }
-      }
+      PropertyTag::ArrayProperty => Self::ArrayTag {
+        value_tag: PropertyTag::read(rdr, names)?,
+      },
       PropertyTag::MapProperty => {
         let key_tag = PropertyTag::read(rdr, names)?;
         let value_tag = PropertyTag::read(rdr, names)?;
@@ -136,9 +157,13 @@ impl PropertyTagData {
       PropertyTag::StructProperty => {
         let (name, name_variant) = names.read_name_with_variant(rdr, "StructTag.name")?;
         let guid = read_bytes(rdr, 16)[0..16].try_into().unwrap();
-        Self::StructTag { name, name_variant, guid }
+        Self::StructTag {
+          name,
+          name_variant,
+          guid,
+        }
       }
-      _ => Self::EmptyTag { tag }
+      _ => Self::EmptyTag { tag },
     };
     rdr.consume(1); // eat the null-terminating byte after the tag data
     Ok(data)
@@ -160,7 +185,11 @@ impl PropertyTagData {
         key_tag.write(curs, names);
         value_tag.write(curs, names);
       }
-      Self::StructTag { name, name_variant, guid } => {
+      Self::StructTag {
+        name,
+        name_variant,
+        guid,
+      } => {
         names.write_name_with_variant(curs, name, *name_variant, "StructTag.name");
         curs.write(guid).unwrap();
       }
@@ -172,11 +201,11 @@ impl PropertyTagData {
   pub fn byte_size(&self) -> usize {
     let data_size = match self {
       Self::EmptyTag { .. } => 0,
-      Self::BoolTag { .. } => 1, // a single u8
-      Self::EnumTag { .. } => 8, // name + name_variant
+      Self::BoolTag { .. } => 1,                             // a single u8
+      Self::EnumTag { .. } => 8,                             // name + name_variant
       Self::ArrayTag { value_tag } => value_tag.byte_size(), // tag size
       Self::MapTag { key_tag, value_tag } => key_tag.byte_size() + value_tag.byte_size(), // tags size
-      Self::StructTag { .. } => 8 + 16, // name + name_variant + guid[u8; 16] 
+      Self::StructTag { .. } => 8 + 16, // name + name_variant + guid[u8; 16]
     };
     data_size + 1
   }
@@ -198,13 +227,19 @@ impl PropertyTag {
       Self::ArrayProperty => true,
       Self::MapProperty => true,
       Self::StructProperty => true,
-      _ => false
+      _ => false,
     }
   }
 }
 
 impl NestedValue {
-  pub fn read(tag: &PropertyTag, rdr: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> Result<Self, String> {
+  pub fn read(
+    tag: &PropertyTag,
+    rdr: &mut Cursor<Vec<u8>>,
+    names: &NameMap,
+    imports: &ObjectImports,
+    exports: &ObjectExports,
+  ) -> Result<Self, String> {
     if tag.is_complex_array_value() {
       let start_pos = rdr.position();
       match Property::read(rdr, names, imports, exports)? {
@@ -213,22 +248,28 @@ impl NestedValue {
           rdr.seek(SeekFrom::Start(start_pos)).unwrap();
           Ok(Self::Complex { value: None })
         }
-        Some(prop) => {
-          Ok(Self::Complex { value: Some(prop) })
-        }
+        Some(prop) => Ok(Self::Complex { value: Some(prop) }),
       }
     } else {
       let tag_data = PropertyTagData::EmptyTag { tag: *tag };
       // Size only matters for Complex types, at least for now
-      Ok(Self::Simple { value: PropertyValue::read(rdr, 0, &tag_data, names, imports, exports)? })
+      Ok(Self::Simple {
+        value: PropertyValue::read(rdr, 0, &tag_data, names, imports, exports)?,
+      })
     }
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> () {
+  pub fn write(
+    &self,
+    curs: &mut Cursor<Vec<u8>>,
+    names: &NameMap,
+    imports: &ObjectImports,
+    exports: &ObjectExports,
+  ) -> () {
     match self {
-      Self::Complex { value: None } => { }
+      Self::Complex { value: None } => {}
       Self::Complex { value: Some(prop) } => prop.write(curs, names, imports, exports),
-      Self::Simple { value } => value.write(curs, names, imports, exports)
+      Self::Simple { value } => value.write(curs, names, imports, exports),
     }
   }
 
@@ -242,7 +283,7 @@ impl NestedValue {
 
 #[derive(Debug, Clone)]
 pub enum PropertyValue {
-  BoolProperty { },
+  BoolProperty {},
   ByteProperty {
     value: u8,
   },
@@ -296,7 +337,7 @@ pub enum PropertyValue {
     value: Dependency,
   },
   StructProperty {
-    data: Vec<u8>
+    data: Vec<u8>,
   },
   SoftObjectProperty {
     object_name: String,
@@ -315,61 +356,102 @@ impl PropertyValue {
     exports: &ObjectExports,
   ) -> Result<Self, String> {
     match tag_data {
-      PropertyTagData::EmptyTag { tag: PropertyTag::ByteProperty } => Ok(Self::ByteProperty {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::ByteProperty,
+      } => Ok(Self::ByteProperty {
         value: rdr.read_u8().unwrap(),
       }),
-      PropertyTagData::EmptyTag { tag: PropertyTag::Int8Property } => Ok(Self::Int8Property {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::Int8Property,
+      } => Ok(Self::Int8Property {
         value: rdr.read_i8().unwrap(),
       }),
-      PropertyTagData::EmptyTag { tag: PropertyTag::Int16Property } => Ok(Self::Int16Property {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::Int16Property,
+      } => Ok(Self::Int16Property {
         value: rdr.read_i16::<LittleEndian>().unwrap(),
       }),
-      PropertyTagData::EmptyTag { tag: PropertyTag::IntProperty } => Ok(Self::IntProperty {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::IntProperty,
+      } => Ok(Self::IntProperty {
         value: rdr.read_i32::<LittleEndian>().unwrap(),
       }),
-      PropertyTagData::EmptyTag { tag: PropertyTag::Int64Property } => Ok(Self::Int64Property {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::Int64Property,
+      } => Ok(Self::Int64Property {
         value: rdr.read_i64::<LittleEndian>().unwrap(),
       }),
-      PropertyTagData::EmptyTag { tag: PropertyTag::UInt16Property } => Ok(Self::UInt16Property {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::UInt16Property,
+      } => Ok(Self::UInt16Property {
         value: rdr.read_u16::<LittleEndian>().unwrap(),
       }),
-      PropertyTagData::EmptyTag { tag: PropertyTag::UInt32Property } => Ok(Self::UInt32Property {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::UInt32Property,
+      } => Ok(Self::UInt32Property {
         value: read_u32(rdr),
       }),
-      PropertyTagData::EmptyTag { tag: PropertyTag::UInt64Property } => Ok(Self::UInt64Property {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::UInt64Property,
+      } => Ok(Self::UInt64Property {
         value: rdr.read_u64::<LittleEndian>().unwrap(),
       }),
-      PropertyTagData::EmptyTag { tag: PropertyTag::FloatProperty } => Ok(Self::FloatProperty {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::FloatProperty,
+      } => Ok(Self::FloatProperty {
         value: rdr.read_f32::<LittleEndian>().unwrap(),
       }),
-      PropertyTagData::EmptyTag { tag: PropertyTag::DoubleProperty } => Ok(Self::DoubleProperty {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::DoubleProperty,
+      } => Ok(Self::DoubleProperty {
         value: rdr.read_f64::<LittleEndian>().unwrap(),
       }),
-      PropertyTagData::EmptyTag { tag: PropertyTag::TextProperty } => {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::TextProperty,
+      } => {
         let bytes = read_bytes(rdr, 13); // TODO
         let value = read_string(rdr);
-        Ok(Self::TextProperty { bytes: bytes[..].try_into().unwrap(), value })
+        Ok(Self::TextProperty {
+          bytes: bytes[..].try_into().unwrap(),
+          value,
+        })
       }
-      PropertyTagData::EmptyTag { tag: PropertyTag::NameProperty } => {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::NameProperty,
+      } => {
         let (name, name_variant) = names.read_name_with_variant(rdr, "NameProperty.name")?;
         Ok(Self::NameProperty { name, name_variant })
       }
-      PropertyTagData::EmptyTag { tag: PropertyTag::ObjectProperty } => {
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::ObjectProperty,
+      } => {
         let value = Dependency::read(rdr, imports, exports)?;
         Ok(Self::ObjectProperty { value })
       }
-      PropertyTagData::EmptyTag { tag: PropertyTag::SoftObjectProperty } => {
-        let (object_name, object_name_variant) = names.read_name_with_variant(rdr, "SoftObjectProperty object_name")?;
+      PropertyTagData::EmptyTag {
+        tag: PropertyTag::SoftObjectProperty,
+      } => {
+        let (object_name, object_name_variant) =
+          names.read_name_with_variant(rdr, "SoftObjectProperty object_name")?;
         let unk1 = read_u32(rdr);
-        Ok(Self::SoftObjectProperty { object_name, object_name_variant, unk1 })
+        Ok(Self::SoftObjectProperty {
+          object_name,
+          object_name_variant,
+          unk1,
+        })
       }
 
-      PropertyTagData::EmptyTag { tag } => Err(format!("Illegal PropertyTagData object {:?}, report to maintainer", tag)),
-      
+      PropertyTagData::EmptyTag { tag } => Err(format!(
+        "Illegal PropertyTagData object {:?}, report to maintainer",
+        tag
+      )),
       PropertyTagData::BoolTag { .. } => Ok(Self::BoolProperty {}),
       PropertyTagData::EnumTag { .. } => {
         let (value, value_variant) = names.read_name_with_variant(rdr, "EnumProperty.value")?;
-        Ok(Self::EnumProperty { value, value_variant })
+        Ok(Self::EnumProperty {
+          value,
+          value_variant,
+        })
       }
       PropertyTagData::ArrayTag { value_tag } => {
         let length = read_u32(rdr);
@@ -383,7 +465,7 @@ impl PropertyValue {
       PropertyTagData::MapTag { key_tag, value_tag } => {
         let flags = read_u32(rdr);
         let num_entries = read_u32(rdr);
-        let mut entries = vec!();
+        let mut entries = vec![];
         for _ in 0..num_entries {
           let key = NestedValue::read(key_tag, rdr, names, imports, exports)?;
           let value = NestedValue::read(value_tag, rdr, names, imports, exports)?;
@@ -398,7 +480,13 @@ impl PropertyValue {
     }
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> () {
+  pub fn write(
+    &self,
+    curs: &mut Cursor<Vec<u8>>,
+    names: &NameMap,
+    imports: &ObjectImports,
+    exports: &ObjectExports,
+  ) -> () {
     match self {
       Self::ByteProperty { value } => curs.write_u8(*value).unwrap(),
       Self::Int8Property { value } => curs.write_i8(*value).unwrap(),
@@ -420,7 +508,11 @@ impl PropertyValue {
       Self::ObjectProperty { value } => {
         value.write(curs, imports, exports);
       }
-      Self::SoftObjectProperty { object_name, object_name_variant, unk1 } => {
+      Self::SoftObjectProperty {
+        object_name,
+        object_name_variant,
+        unk1,
+      } => {
         let object_name_n = names
           .get_name_obj(object_name)
           .expect("Invalid SoftObjectProperty object_name");
@@ -428,8 +520,11 @@ impl PropertyValue {
         write_u32(curs, *object_name_variant);
         write_u32(curs, *unk1);
       }
-      Self::BoolProperty { } => { },
-      Self::EnumProperty { value, value_variant } => {
+      Self::BoolProperty {} => {}
+      Self::EnumProperty {
+        value,
+        value_variant,
+      } => {
         names.write_name_with_variant(curs, value, *value_variant, "EnumProperty.value");
       }
       Self::ArrayProperty { values } => {
@@ -454,7 +549,7 @@ impl PropertyValue {
 
   pub fn byte_size(&self) -> usize {
     match self {
-      Self::BoolProperty { } => 0,
+      Self::BoolProperty {} => 0,
       Self::ByteProperty { .. } => 1,
       Self::Int8Property { .. } => 1,
       Self::Int16Property { .. } => 2,
@@ -477,7 +572,11 @@ impl PropertyValue {
       }
       Self::MapProperty { entries, .. } => {
         // flags + length + entries size
-        4 + 4 + entries.iter().map(|(k, v)| k.byte_size() + v.byte_size()).sum::<usize>()
+        4 + 4
+          + entries
+            .iter()
+            .map(|(k, v)| k.byte_size() + v.byte_size())
+            .sum::<usize>()
       }
       Self::ObjectProperty { .. } => 4,
       Self::StructProperty { data } => data.len(),
@@ -538,7 +637,13 @@ impl Property {
     }));
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> () {
+  pub fn write(
+    &self,
+    curs: &mut Cursor<Vec<u8>>,
+    names: &NameMap,
+    imports: &ObjectImports,
+    exports: &ObjectExports,
+  ) -> () {
     names.write_name_with_variant(curs, &self.name, self.name_variant, "Property.name");
     self.tag.write(curs, names);
     curs.write_u64::<LittleEndian>(self.size).unwrap();
@@ -559,7 +664,13 @@ pub struct Struct {
 }
 
 impl Struct {
-  pub fn read(rdr: &mut Cursor<Vec<u8>>, export: &ObjectExport, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> Result<Self, String> {
+  pub fn read(
+    rdr: &mut Cursor<Vec<u8>>,
+    export: &ObjectExport,
+    names: &NameMap,
+    imports: &ObjectImports,
+    exports: &ObjectExports,
+  ) -> Result<Self, String> {
     if rdr.position() != export.export_file_offset.into() {
       return Err(
         format!(
@@ -570,7 +681,6 @@ impl Struct {
         .to_string(),
       );
     }
-    
     let start_pos = rdr.position();
     let mut properties = vec![];
     // Read properties until summary.tag is seen
@@ -591,7 +701,13 @@ impl Struct {
     Ok(Self { properties, extra })
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> () {
+  pub fn write(
+    &self,
+    curs: &mut Cursor<Vec<u8>>,
+    names: &NameMap,
+    imports: &ObjectImports,
+    exports: &ObjectExports,
+  ) -> () {
     for prop in self.properties.iter() {
       prop.write(curs, names, imports, exports);
     }
@@ -610,15 +726,21 @@ impl Struct {
   pub fn find(&mut self, name: &str) -> Option<&mut Property> {
     for prop in self.properties.iter_mut() {
       if prop.name == name {
-        return Some(prop)
+        return Some(prop);
       }
     }
-    return None
+    return None;
   }
 
   pub fn byte_size(&self) -> usize {
     // Size of properties plus size of None property at end of the struct and the extra data
-    self.properties.iter().map(Property::byte_size).sum::<usize>() + 8 + self.extra.len()
+    self
+      .properties
+      .iter()
+      .map(Property::byte_size)
+      .sum::<usize>()
+      + 8
+      + self.extra.len()
   }
 
   pub fn total_size(structs: &Vec<Struct>) -> usize {

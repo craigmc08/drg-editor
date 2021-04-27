@@ -1,6 +1,6 @@
-pub mod util;
 pub mod asset;
 pub mod editor;
+pub mod util;
 
 use asset::*;
 use std::env;
@@ -16,8 +16,18 @@ fn main() {
     let asset_loc: &Path = args[1].as_ref();
     let mut asset = Asset::read_from(asset_loc);
 
-    asset.import("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun", Dependency::UObject);
-    asset.import("/Script/FSD", "ItemID", "ID_GrapplingGun", Dependency::import("/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun"));
+    asset.import(
+        "/Script/CoreUObject",
+        "Package",
+        "/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun",
+        Dependency::UObject,
+    );
+    asset.import(
+        "/Script/FSD",
+        "ItemID",
+        "ID_GrapplingGun",
+        Dependency::import("/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun"),
+    );
 
     let data = &mut asset.structs[0];
     let new_tools = vec![Dependency::import("ID_GrapplingGun")];

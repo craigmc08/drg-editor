@@ -10,9 +10,15 @@ pub enum Dependency {
 }
 
 impl Dependency {
-  pub fn import(name: &str) -> Self { Self::Import(name.to_string(), 0) }
-  pub fn export(name: &str) -> Self { Self::Export(name.to_string(), 0) }
-  pub fn uobject() -> Self { Self::UObject }
+  pub fn import(name: &str) -> Self {
+    Self::Import(name.to_string(), 0)
+  }
+  pub fn export(name: &str) -> Self {
+    Self::Export(name.to_string(), 0)
+  }
+  pub fn uobject() -> Self {
+    Self::UObject
+  }
 
   pub fn serialize(&self, imports: &ObjectImports, exports: &ObjectExports) -> i32 {
     match self {
@@ -22,11 +28,16 @@ impl Dependency {
         .expect("Invalid Dependency::Import name"),
       Self::Export(name, variant) => exports
         .serialized_index_of(name, *variant)
-        .expect("Invalid Dependency::Export export name") as i32,
+        .expect("Invalid Dependency::Export export name")
+        as i32,
     }
   }
 
-  pub fn read(rdr: &mut Cursor<Vec<u8>>, imports: &ObjectImports, exports: &ObjectExports) -> Result<Self, String> {
+  pub fn read(
+    rdr: &mut Cursor<Vec<u8>>,
+    imports: &ObjectImports,
+    exports: &ObjectExports,
+  ) -> Result<Self, String> {
     let idx = read_u32(rdr);
     // If idx (as an i32) is negative
     if idx == 0 {
@@ -42,11 +53,19 @@ impl Dependency {
         (idx - 1) as u64,
         &format!("PreloadDependency export @ {:04X}", rdr.position()),
       )?;
-      Ok(Self::Export(export.object_name.clone(), export.object_name_variant))
+      Ok(Self::Export(
+        export.object_name.clone(),
+        export.object_name_variant,
+      ))
     }
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, imports: &ObjectImports, exports: &ObjectExports) -> () {
+  pub fn write(
+    &self,
+    curs: &mut Cursor<Vec<u8>>,
+    imports: &ObjectImports,
+    exports: &ObjectExports,
+  ) -> () {
     let dep_i = match self {
       Self::UObject => 0,
       Self::Import(name, variant) => imports
@@ -113,9 +132,13 @@ impl PreloadDependencies {
 
   // TODO check for duplicates
   pub fn add_import(&mut self, name: &str) -> () {
-    self.dependencies.push(Dependency::Import(name.to_string(), 0));
+    self
+      .dependencies
+      .push(Dependency::Import(name.to_string(), 0));
   }
   pub fn add_export(&mut self, name: &str) -> () {
-    self.dependencies.push(Dependency::Export(name.to_string(), 0));
+    self
+      .dependencies
+      .push(Dependency::Export(name.to_string(), 0));
   }
 }

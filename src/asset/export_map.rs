@@ -7,20 +7,20 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct ObjectExport {
-  pub class: u32, // just storing u32 because idc what this is
-  pub super_index: i32, // not sure what this represents
-  pub template: u32, // just storing u32 because idc what this is
-  pub outer: i32,    // again, idk
+  pub class: u32,          // just storing u32 because idc what this is
+  pub super_index: i32,    // not sure what this represents
+  pub template: u32,       // just storing u32 because idc what this is
+  pub outer: i32,          // again, idk
   pub object_name: String, // stored as index into name_map
   pub object_name_variant: u32,
-  pub object_flags: u32, // just some bytes
+  pub object_flags: u32,       // just some bytes
   pub serial_size: u64, // size of uexp struct, 4 bytes of padding after this are incorporated into the value?
   pub serial_offset: u32, // same as file_summary.total_header_size
   pub export_file_offset: u64, // NOT STORED IN FILE
-  pub forced_export: bool,  // 4 bytes
+  pub forced_export: bool, // 4 bytes
   pub not_for_client: bool, // 4 bytes
   pub not_for_server: bool, // 4 bytes
-  pub was_filtered: bool,   // 4 bytes
+  pub was_filtered: bool, // 4 bytes
   pub package_guid: [u8; 16],
   pub package_flags: u32,
   pub not_always_loaded_for_editor_game: bool, // 4 bytes
@@ -48,7 +48,8 @@ impl ObjectExport {
     let super_index = rdr.read_i32::<LittleEndian>().unwrap();
     let template = read_u32(rdr);
     let outer = rdr.read_i32::<LittleEndian>().unwrap();
-    let (object_name, object_name_variant) = names.read_name_with_variant(rdr, "ObjectExports.object_name")?;
+    let (object_name, object_name_variant) =
+      names.read_name_with_variant(rdr, "ObjectExports.object_name")?;
     let object_flags = rdr.read_u32::<LittleEndian>().unwrap();
     let serial_size = rdr.read_u64::<LittleEndian>().unwrap();
     let serial_offset = read_u32(rdr);
@@ -168,7 +169,7 @@ impl ObjectExports {
       }
       i += 1;
     }
-    return None
+    return None;
   }
 
   pub fn lookup(&self, index: u64, rep: &str) -> Result<&ObjectExport, String> {

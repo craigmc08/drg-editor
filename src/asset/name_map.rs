@@ -119,18 +119,30 @@ impl NameMap {
     let index = rdr.read_u32::<LittleEndian>().unwrap();
     match self.lookup(index, rep).map(|x| x.name.clone()) {
       Err(err) => Err(format!("{} at {:04X}", err, rdr.position())),
-      Ok(x) => Ok(x)
+      Ok(x) => Ok(x),
     }
   }
 
-  pub fn read_name_with_variant(&self, rdr: &mut Cursor<Vec<u8>>, rep: &str) -> Result<(String, u32), String> {
+  pub fn read_name_with_variant(
+    &self,
+    rdr: &mut Cursor<Vec<u8>>,
+    rep: &str,
+  ) -> Result<(String, u32), String> {
     let name = self.read_name(rdr, rep)?;
     let variant = read_u32(rdr);
     Ok((name, variant))
   }
 
-  pub fn write_name_with_variant(&self, curs: &mut Cursor<Vec<u8>>, name: &str, variant: u32, rep: &str) -> () {
-    let name_n = self.get_name_obj(name).expect(&format!("Name {} for {} not in NameMap", name, rep));
+  pub fn write_name_with_variant(
+    &self,
+    curs: &mut Cursor<Vec<u8>>,
+    name: &str,
+    variant: u32,
+    rep: &str,
+  ) -> () {
+    let name_n = self
+      .get_name_obj(name)
+      .expect(&format!("Name {} for {} not in NameMap", name, rep));
     write_u32(curs, name_n.index);
     write_u32(curs, variant);
   }

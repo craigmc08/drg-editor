@@ -1,7 +1,7 @@
 use crate::asset::*;
 use crate::util::*;
-use std::io::Cursor;
 use std::io::prelude::*;
+use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct AssetRegistry {
@@ -26,7 +26,8 @@ impl AssetRegistry {
 
     let depends_len = (summary.asset_registry_data_offset - summary.depends_offset) as usize;
     let depends = read_bytes(rdr, depends_len);
-    let assets_len = (summary.preload_dependency_offset - summary.asset_registry_data_offset) as usize;
+    let assets_len =
+      (summary.preload_dependency_offset - summary.asset_registry_data_offset) as usize;
     let registry = read_bytes(rdr, assets_len);
 
     return Ok(AssetRegistry { depends, registry });

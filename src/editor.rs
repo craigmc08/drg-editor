@@ -4,7 +4,6 @@ use crate::asset::*;
 pub trait AsProperty {
   fn tag() -> PropertyTag;
   fn as_property(&self, name: &str) -> Property;
-  
   fn as_nested_value(&self, name: &str) -> NestedValue {
     let prop = self.as_property(name);
     if Self::tag().is_complex_array_value() {
@@ -16,7 +15,10 @@ pub trait AsProperty {
 }
 
 /// Represents a value that can be created from a property
-pub trait FromProperty where Self: std::marker::Sized {
+pub trait FromProperty
+where
+  Self: std::marker::Sized,
+{
   fn from_property(property: &Property) -> Option<Self>;
 
   /// Assumes that [`Self::from_property`] if, as a nested value, T is a
@@ -28,10 +30,12 @@ pub trait FromProperty where Self: std::marker::Sized {
         name: "".to_string(),
         name_variant: 0,
         tag: PropertyTag::ByteProperty,
-        tag_data: PropertyTagData::EmptyTag { tag: PropertyTag::ByteProperty },
+        tag_data: PropertyTagData::EmptyTag {
+          tag: PropertyTag::ByteProperty,
+        },
         size: 0,
         value: value.clone(),
-      })
+      }),
     }
   }
 }
@@ -41,7 +45,7 @@ impl Struct {
   pub fn get<T: FromProperty>(&self, name: &str) -> Option<T> {
     for prop in self.properties.iter() {
       if prop.name == name {
-        return T::from_property(prop)
+        return T::from_property(prop);
       }
     }
     None
@@ -63,16 +67,16 @@ impl Struct {
 
 impl Asset {
   /// Import an object into the asset
-  /// 
+  ///
   /// # Arguments
-  /// 
+  ///
   /// * `class_package` - The package of the item to import
   /// * `class` - The class of the item to import
   /// * `name` - The name of the item to import
-  /// 
-  /// 
+  ///
+  ///
   /// # Examples
-  /// 
+  ///
   /// ```
   /// asset.import("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun", Dependency::UObject);
   /// asset.import("/Script/FSD", "ItemID", "ID_GrapplingGun", Dependency::Import("/Game/WeaponsNTools/GrapplingGun/ID_Grappling");
@@ -82,20 +86,30 @@ impl Asset {
     self.names.add(class_package);
     self.names.add(class);
     self.names.add(name);
-    
-    match self.imports.objects.iter().position(|object| object.name == name) {
+
+    match self
+      .imports
+      .objects
+      .iter()
+      .position(|object| object.name == name)
+    {
       None => {
         // Create a new import
         let outer_index = outer.serialize(&self.imports, &self.exports);
         self.imports.add(class_package, class, name, outer_index);
       }
-      Some(_) => { }
+      Some(_) => {}
     }
   }
 
   /// Add an imported object to the preloaded dependencies
   pub fn preload(&mut self, dep: Dependency) -> () {
-    match self.dependencies.dependencies.iter().position(|d| d.clone() == dep) {
+    match self
+      .dependencies
+      .dependencies
+      .iter()
+      .position(|d| d.clone() == dep)
+    {
       None => {
         // Create a new preload
         self.dependencies.dependencies.push(dep);
@@ -106,28 +120,39 @@ impl Asset {
 
   /// List the names of all exported Structs
   pub fn list_structs(&self) -> Vec<String> {
-    self.exports.exports.iter().map(|export| export.object_name.clone()).collect()
+    self
+      .exports
+      .exports
+      .iter()
+      .map(|export| export.object_name.clone())
+      .collect()
   }
 
   /// Attempt to borrow an exported Struct by name.
-  /// 
+  ///
   /// To borrow the Struct as mutable, see [Self::get_struct_mut]
   pub fn get_struct(&self, name: &str) -> Option<&Struct> {
-    match self.exports.exports.iter().position(|exp| exp.object_name == name) {
+    match self
+      .exports
+      .exports
+      .iter()
+      .position(|exp| exp.object_name == name)
+    {
       None => None,
-      Some(i) => {
-        Some(&self.structs[i])
-      }
+      Some(i) => Some(&self.structs[i]),
     }
   }
 
   /// Attempt to borrow as mutable an exported Struct by name.
   pub fn get_struct_mut(&mut self, name: &str) -> Option<&mut Struct> {
-    match self.exports.exports.iter().position(|exp| exp.object_name == name) {
+    match self
+      .exports
+      .exports
+      .iter()
+      .position(|exp| exp.object_name == name)
+    {
       None => None,
-      Some(i) => {
-        Some(&mut self.structs[i])
-      }
+      Some(i) => Some(&mut self.structs[i]),
     }
   }
 }
@@ -155,7 +180,7 @@ impl FromProperty for bool {
   fn from_property(property: &Property) -> Option<Self> {
     match property.tag_data {
       PropertyTagData::BoolTag { value } => Some(value),
-      _ => None
+      _ => None,
     }
   }
 }
@@ -171,7 +196,7 @@ impl AsProperty for u8 {
       tag: Self::tag(),
       size: 1,
       tag_data: PropertyTagData::EmptyTag { tag: Self::tag() },
-      value: PropertyValue::ByteProperty { value: *self }
+      value: PropertyValue::ByteProperty { value: *self },
     }
   }
 }
@@ -179,17 +204,22 @@ impl FromProperty for u8 {
   fn from_property(property: &Property) -> Option<Self> {
     match property.value {
       PropertyValue::ByteProperty { value } => Some(value),
-      _ => None
+      _ => None,
     }
   }
 }
 
-impl<T> AsProperty for Vec<T> where T: AsProperty {
+impl<T> AsProperty for Vec<T>
+where
+  T: AsProperty,
+{
   fn tag() -> PropertyTag {
     PropertyTag::ArrayProperty
   }
   fn as_property(&self, name: &str) -> Property {
-    let tag_data = PropertyTagData::ArrayTag { value_tag: T::tag() };
+    let tag_data = PropertyTagData::ArrayTag {
+      value_tag: T::tag(),
+    };
     let array: Vec<NestedValue> = self.iter().map(|t| t.as_nested_value(name)).collect();
     let size = array.iter().map(|nv| nv.byte_size()).sum::<usize>() + 4;
     Property {
@@ -198,17 +228,20 @@ impl<T> AsProperty for Vec<T> where T: AsProperty {
       tag: Self::tag(),
       size: size as u64,
       tag_data,
-      value: PropertyValue::ArrayProperty { values: array }
+      value: PropertyValue::ArrayProperty { values: array },
     }
   }
 }
-impl<T> FromProperty for Vec<Option<T>> where T: FromProperty {
+impl<T> FromProperty for Vec<Option<T>>
+where
+  T: FromProperty,
+{
   fn from_property(property: &Property) -> Option<Self> {
     match &property.value {
       PropertyValue::ArrayProperty { values } => {
         Some(values.iter().map(|nv| T::from_nested_value(nv)).collect())
       }
-      _ => None
+      _ => None,
     }
   }
 }
@@ -224,7 +257,9 @@ impl AsProperty for Dependency {
       tag: Self::tag(),
       size: 8,
       tag_data: PropertyTagData::EmptyTag { tag: Self::tag() },
-      value: PropertyValue::ObjectProperty { value: self.clone() }
+      value: PropertyValue::ObjectProperty {
+        value: self.clone(),
+      },
     }
   }
 }
@@ -232,7 +267,7 @@ impl FromProperty for Dependency {
   fn from_property(property: &Property) -> Option<Self> {
     match &property.value {
       PropertyValue::ObjectProperty { value } => Some(value.clone()),
-      _ => None
+      _ => None,
     }
   }
 }

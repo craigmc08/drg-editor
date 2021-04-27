@@ -7,10 +7,10 @@ use std::io::Cursor;
 pub struct ObjectImport {
   pub class_package: String, // stored in file as uint64 index into name_map
   pub cpkg_variant: u32,
-  pub class: String,         // same as before
+  pub class: String, // same as before
   pub class_variant: u32,
-  pub outer_index: i32,      // idk what this represents
-  pub name: String,          // same as class_package
+  pub outer_index: i32, // idk what this represents
+  pub name: String,     // same as class_package
   pub name_variant: u32,
 }
 
@@ -21,7 +21,8 @@ pub struct ObjectImports {
 
 impl ObjectImport {
   fn read(rdr: &mut Cursor<Vec<u8>>, name_map: &NameMap) -> Result<Self, String> {
-    let (class_package, cpkg_variant) = name_map.read_name_with_variant(rdr, "ObjectImport.class_package")?;
+    let (class_package, cpkg_variant) =
+      name_map.read_name_with_variant(rdr, "ObjectImport.class_package")?;
     let (class, class_variant) = name_map.read_name_with_variant(rdr, "ObjectImport.class")?;
     let outer_index = rdr.read_i32::<LittleEndian>().unwrap();
     let (name, name_variant) = name_map.read_name_with_variant(rdr, "ObjectImport.name")?;
@@ -46,7 +47,6 @@ impl ObjectImport {
     let name = names
       .get_name_obj(&self.name)
       .expect("Invalid ObjectImport name");
-      
     curs.write_u32::<LittleEndian>(cpkg.index).unwrap();
     write_u32(curs, self.cpkg_variant);
     curs.write_u32::<LittleEndian>(class.index).unwrap();
@@ -101,13 +101,11 @@ impl ObjectImports {
       }
       i += 1;
     }
-    return None
+    return None;
   }
 
   pub fn serialized_index_of(&self, object: &str, variant: u32) -> Option<u32> {
-    self.index_of(object, variant).map(|i| {
-      i as u32
-    })
+    self.index_of(object, variant).map(|i| i as u32)
   }
 
   pub fn lookup(&self, index: u64, rep: &str) -> Result<&ObjectImport, String> {
@@ -136,7 +134,7 @@ impl ObjectImports {
       class_variant: 0,
       name: name.to_string(),
       name_variant: 0,
-      outer_index: idx
+      outer_index: idx,
     };
     let len = self.objects.len();
     self.objects.push(object);
@@ -148,7 +146,7 @@ impl ObjectImports {
     let index = std::u32::MAX - index_raw; // import indices are stored as -index - 1, for some reason
     match self.lookup(index.into(), rep).map(|x| x.name.clone()) {
       Err(err) => Err(format!("{} at {:04X}", err, rdr.position())),
-      Ok(x) => Ok(x)
+      Ok(x) => Ok(x),
     }
   }
 }
