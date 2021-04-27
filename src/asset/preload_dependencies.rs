@@ -2,7 +2,7 @@ use crate::asset::*;
 use crate::util::*;
 use std::io::Cursor;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Dependency {
   UObject,
   Import(String, u32),
@@ -10,6 +10,22 @@ pub enum Dependency {
 }
 
 impl Dependency {
+  pub fn import(name: &str) -> Self { Self::Import(name.to_string(), 0) }
+  pub fn export(name: &str) -> Self { Self::Export(name.to_string(), 0) }
+  pub fn uobject() -> Self { Self::UObject }
+
+  pub fn serialize(&self, imports: &ObjectImports, exports: &ObjectExports) -> i32 {
+    match self {
+      Self::UObject => 0,
+      Self::Import(name, variant) => imports
+        .index_of(name, *variant)
+        .expect("Invalid Dependency::Import name"),
+      Self::Export(name, variant) => exports
+        .serialized_index_of(name, *variant)
+        .expect("Invalid Dependency::Export export name") as i32,
+    }
+  }
+
   pub fn read(rdr: &mut Cursor<Vec<u8>>, imports: &ObjectImports, exports: &ObjectExports) -> Result<Self, String> {
     let idx = read_u32(rdr);
     // If idx (as an i32) is negative
@@ -40,6 +56,7 @@ impl Dependency {
         .serialized_index_of(name, *variant)
         .expect("Invalid PreloadDependency export name"),
     };
+    println!("Serialized Dependency {:?} to {}", self, dep_i);
     write_u32(curs, dep_i);
   }
 }
@@ -74,21 +91,6 @@ impl PreloadDependencies {
     for _ in 0..summary.preload_dependency_count {
       let dependency = Dependency::read(rdr, imports, exports)?;
       dependencies.push(dependency);
-      // let idx = read_u32(rdr);
-      // // If idx (as an i32) is negative
-      // if (idx & 0x80000000) > 0 {
-      //   let import = imports.lookup(
-      //     (std::u32::MAX - idx) as u64,
-      //     &format!("PreloadDependency import @ {:04X}", rdr.position()),
-      //   )?;
-      //   dependencies.push(Dependency::Import(import.name.clone(), import.name_variant));
-      // } else {
-      //   let export = exports.lookup(
-      //     (idx - 1) as u64,
-      //     &format!("PreloadDependency export @ {:04X}", rdr.position()),
-      //   )?;
-      //   dependencies.push(Dependency::Export(export.object_name.clone(), export.object_name_variant));
-      // }
     }
 
     return Ok(PreloadDependencies { dependencies });
@@ -102,15 +104,6 @@ impl PreloadDependencies {
   ) -> () {
     for dep in self.dependencies.iter() {
       dep.write(curs, imports, exports);
-      // let dep_i = match dep {
-      //   Dependency::Import(name, variant) => imports
-      //     .serialized_index_of(name, *variant)
-      //     .expect("Invalid PreloadDependency import name"),
-      //   Dependency::Export(name, variant) => exports
-      //     .serialized_index_of(name, *variant)
-      //     .expect("Invalid PreloadDependency export name"),
-      // };
-      // write_u32(curs, dep_i);
     }
   }
 

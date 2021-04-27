@@ -1,5 +1,6 @@
 pub mod util;
 pub mod asset;
+pub mod editor;
 
 use asset::*;
 use std::env;
@@ -28,54 +29,6 @@ fn main() {
         Ok((uasset, uexp)) => {
             let mut asset = Asset::read(uasset, uexp);
 
-            // Add some data!
-            // asset.names.add("/Game/WeaponsNTools/ZipLineGun/ID_ZiplineGun");
-            // asset.names.add("ID_ZiplineGun");
-            // asset.names.add("/Game/WeaponsNTools/Drills/ID_DoubleDrills");
-            // asset.names.add("ID_DoubleDrills");
-            // asset.names.add("/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun");
-            // asset.names.add("ID_GrapplingGun");
-            // asset.names.add("/Game/WeaponsNTools/PlatformGun/ID_PlatformGun");
-            // asset.names.add("ID_PlatformGun");
-
-            // let zip_idx = asset.imports.add("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/ZipLineGun/ID_ZiplineGun", 0);
-            // let drill_idx = asset.imports.add("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/Drills/ID_DoubleDrills", 0);
-            // let grapple_idx = asset.imports.add("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun", 0);
-            // let platform_idx = asset.imports.add("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/PlatformGun/ID_PlatformGun", 0);
-            // zip_idx.map(|i| {
-            //     println!("Adding zipline gun (outer={})", i);
-            //     asset.imports.add("/Script/FSD", "ItemID", "ID_ZiplineGun", i);
-            //     asset.dependencies.add_import("ID_ZiplineGun");
-            // });
-            // drill_idx.map(|i| {
-            //     println!("Adding drills (outer={})", i);
-            //     asset.imports.add("/Script/FSD", "ItemID", "ID_DoubleDrills", i);
-            //     asset.dependencies.add_import("ID_DoubleDrills");
-            // });
-            // grapple_idx.map(|i| {
-            //     println!("Adding grappling gun (outer={})", i);
-            //     asset.imports.add("/Script/FSD", "ItemID", "ID_GrapplingGun", i);
-            //     asset.dependencies.add_import("ID_GrapplingGun");
-            // });
-            // platform_idx.map(|i| {
-            //     println!("Adding platform gun (outer={})", i);
-            //     asset.imports.add("/Script/FSD", "ItemID", "ID_PlatformGun", i);
-            //     asset.dependencies.add_import("ID_PlatformGun");
-            // });
-
-            // // Add all tools to TraversalTools
-            // let traversal_tools = Property::find(&mut asset.properties, "TraversalTools").expect("Expected TerrainTools property");
-            // traversal_tools.value = PropertyValue::ArrayProperty {
-            //     value_tag: "ObjectProperty".to_string(),
-            //     values: vec![
-            //         PropertyValue::ObjectProperty { value: "ID_ZiplineGun".to_string()  },
-            //         PropertyValue::ObjectProperty { value: "ID_GrapplingGun".to_string()  },
-            //         PropertyValue::ObjectProperty { value: "ID_DoubleDrills".to_string()  },
-            //         PropertyValue::ObjectProperty { value: "ID_PlatformGun".to_string() },
-            //     ],
-            // };
-
-            // asset.recalculate_offsets();
             println!("{:#?}", asset.summary);
             println!("{:#?}", asset.names);
             println!("{:#?}", asset.imports);
@@ -83,6 +36,16 @@ fn main() {
             println!("{:#?}", asset.assets);
             println!("{:#?}", asset.dependencies);
             println!("{:#?}", asset.structs);
+
+            asset.import("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun", Dependency::UObject);
+            asset.import("/Script/FSD", "ItemID", "ID_GrapplingGun", Dependency::import("/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun"));
+
+            let data = &mut asset.structs[0];
+            let new_tools = vec![Dependency::import("ID_GrapplingGun")];
+            data.set("TraversalTools", new_tools);
+
+            // Make sure to recalculate offsets
+            asset.recalculate_offsets();
 
             let (uasset_out, uexp_out) = asset.write();
 

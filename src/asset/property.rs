@@ -104,7 +104,7 @@ impl PropertyTag {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PropertyTagData {
   EmptyTag { tag: PropertyTag },
   BoolTag { value: bool },
@@ -182,7 +182,7 @@ impl PropertyTagData {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum NestedValue {
   Simple { value: PropertyValue },
   Complex { value: Option<Property> },
@@ -240,7 +240,7 @@ impl NestedValue {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PropertyValue {
   BoolProperty { },
   ByteProperty {
@@ -385,7 +385,7 @@ impl PropertyValue {
         let flags = read_u32(rdr);
         let num_entries = read_u32(rdr);
         let mut entries = vec!();
-        for i in 0..num_entries {
+        for _ in 0..num_entries {
           let key = NestedValue::read(key_tag, rdr, names, imports, exports)?;
           let value = NestedValue::read(value_tag, rdr, names, imports, exports)?;
           entries.push((key, value));
@@ -487,7 +487,7 @@ impl PropertyValue {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Property {
   pub name: String, // u632 index into name_map
   pub name_variant: u32,
@@ -548,8 +548,8 @@ impl Property {
   }
 
   pub fn byte_size(&self) -> usize {
-    // 8 bytes each for name, tag, and size, 1 byte for random padding and obviously size bytes for the value
-    25 + self.value.byte_size()
+    // 8 bytes for name, then tag size, then u64 size, then size of tag_data and value
+    8 + self.tag.byte_size() + 8 + self.tag_data.byte_size() + self.value.byte_size()
   }
 }
 
@@ -621,7 +621,7 @@ impl Struct {
 
   pub fn byte_size(&self) -> usize {
     // Size of properties plus size of None property at end of the struct and the extra data
-    self.properties.iter().map(Property::byte_size).sum::<usize>() + 12 + self.extra.len()
+    self.properties.iter().map(Property::byte_size).sum::<usize>() + 8 + self.extra.len()
   }
 
   pub fn total_size(structs: &Vec<Struct>) -> usize {

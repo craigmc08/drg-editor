@@ -107,11 +107,18 @@ impl Asset {
         + self.exports.byte_size()
         + self.assets.byte_size()) as u32;
 
-    let mut export_offset = self.summary.total_header_size;
+    // Update all generations counts
+    for generation in self.summary.generations.iter_mut() {
+      generation.export_count = self.summary.export_count;
+      generation.name_count = self.summary.name_count;
+    }
+
+    let mut running_size_total = 0;
     for i in 0..(self.summary.export_count as usize) {
-      self.exports.exports[i].serial_size =  Struct::total_size(&self.structs) as u64;
-      export_offset += self.exports.exports[i].serial_size as u32;
-      self.exports.exports[i].serial_offset = export_offset;
+      self.exports.exports[i].export_file_offset = running_size_total as u64;
+      self.exports.exports[i].serial_size = Struct::total_size(&self.structs) as u64;
+      self.exports.exports[i].serial_offset = running_size_total + self.summary.total_header_size;
+      running_size_total += self.exports.exports[i].serial_size as u32;
     }
   }
 }

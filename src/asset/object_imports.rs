@@ -46,6 +46,7 @@ impl ObjectImport {
     let name = names
       .get_name_obj(&self.name)
       .expect("Invalid ObjectImport name");
+    println!("Serialized ObjectImport: cpkg={} class={} name={}", cpkg.index, class.index, name.index);
     curs.write_u32::<LittleEndian>(cpkg.index).unwrap();
     write_u32(curs, self.cpkg_variant);
     curs.write_u32::<LittleEndian>(class.index).unwrap();
@@ -92,15 +93,21 @@ impl ObjectImports {
     28 * self.objects.len()
   }
 
-  pub fn serialized_index_of(&self, object: &str, variant: u32) -> Option<u32> {
-    let mut i: u32 = 0;
+  pub fn index_of(&self, object: &str, variant: u32) -> Option<i32> {
+    let mut i: i32 = 0;
     for import in self.objects.iter() {
       if import.name == object && import.name_variant == variant {
-        return Some(std::u32::MAX - i);
+        return Some(-i - 1);
       }
       i += 1;
     }
     return None
+  }
+
+  pub fn serialized_index_of(&self, object: &str, variant: u32) -> Option<u32> {
+    self.index_of(object, variant).map(|i| {
+      i as u32
+    })
   }
 
   pub fn lookup(&self, index: u64, rep: &str) -> Result<&ObjectImport, String> {
