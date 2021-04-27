@@ -14,6 +14,33 @@ pub trait AsProperty {
   }
 }
 
+/// For properties without `tag_data`, you can use this trait to implement
+/// [`AsProperty`] with less boilerplate
+pub trait AsSimpleProperty {
+  fn tag() -> PropertyTag;
+  fn as_simple_property(&self) -> PropertyValue;
+}
+
+impl<T> AsProperty for T
+where
+  T: AsSimpleProperty,
+{
+  fn tag() -> PropertyTag {
+    <Self as AsSimpleProperty>::tag()
+  }
+  fn as_property(&self, name: &str) -> Property {
+    let value = self.as_simple_property();
+    Property {
+      name: name.to_string(),
+      name_variant: 0,
+      tag: Self::tag(),
+      size: value.byte_size() as u64,
+      tag_data: PropertyTagData::EmptyTag { tag: Self::tag() },
+      value,
+    }
+  }
+}
+
 /// Represents a value that can be created from a property
 pub trait FromProperty
 where
@@ -185,25 +212,171 @@ impl FromProperty for bool {
   }
 }
 
-impl AsProperty for u8 {
+impl AsSimpleProperty for u8 {
   fn tag() -> PropertyTag {
     PropertyTag::ByteProperty
   }
-  fn as_property(&self, name: &str) -> Property {
-    Property {
-      name: name.to_string(),
-      name_variant: 0,
-      tag: Self::tag(),
-      size: 1,
-      tag_data: PropertyTagData::EmptyTag { tag: Self::tag() },
-      value: PropertyValue::ByteProperty { value: *self },
-    }
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::ByteProperty { value: *self }
   }
 }
 impl FromProperty for u8 {
   fn from_property(property: &Property) -> Option<Self> {
     match property.value {
       PropertyValue::ByteProperty { value } => Some(value),
+      _ => None,
+    }
+  }
+}
+
+impl AsSimpleProperty for u16 {
+  fn tag() -> PropertyTag {
+    PropertyTag::UInt16Property
+  }
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::UInt16Property { value: *self }
+  }
+}
+impl FromProperty for u16 {
+  fn from_property(property: &Property) -> Option<Self> {
+    match property.value {
+      PropertyValue::UInt16Property { value } => Some(value),
+      _ => None,
+    }
+  }
+}
+
+impl AsSimpleProperty for u32 {
+  fn tag() -> PropertyTag {
+    PropertyTag::UInt32Property
+  }
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::UInt32Property { value: *self }
+  }
+}
+impl FromProperty for u32 {
+  fn from_property(property: &Property) -> Option<Self> {
+    match property.value {
+      PropertyValue::UInt32Property { value } => Some(value),
+      _ => None,
+    }
+  }
+}
+
+impl AsSimpleProperty for u64 {
+  fn tag() -> PropertyTag {
+    PropertyTag::UInt64Property
+  }
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::UInt64Property { value: *self }
+  }
+}
+impl FromProperty for u64 {
+  fn from_property(property: &Property) -> Option<Self> {
+    match property.value {
+      PropertyValue::UInt64Property { value } => Some(value),
+      _ => None,
+    }
+  }
+}
+
+impl AsSimpleProperty for i8 {
+  fn tag() -> PropertyTag {
+    PropertyTag::Int8Property
+  }
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::Int8Property { value: *self }
+  }
+}
+impl FromProperty for i8 {
+  fn from_property(property: &Property) -> Option<Self> {
+    match property.value {
+      PropertyValue::Int8Property { value } => Some(value),
+      _ => None,
+    }
+  }
+}
+
+impl AsSimpleProperty for i16 {
+  fn tag() -> PropertyTag {
+    PropertyTag::Int16Property
+  }
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::Int16Property { value: *self }
+  }
+}
+impl FromProperty for i16 {
+  fn from_property(property: &Property) -> Option<Self> {
+    match property.value {
+      PropertyValue::Int16Property { value } => Some(value),
+      _ => None,
+    }
+  }
+}
+
+impl AsSimpleProperty for i32 {
+  fn tag() -> PropertyTag {
+    PropertyTag::IntProperty
+  }
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::IntProperty { value: *self }
+  }
+}
+impl FromProperty for i32 {
+  fn from_property(property: &Property) -> Option<Self> {
+    match property.value {
+      PropertyValue::IntProperty { value } => Some(value),
+      _ => None,
+    }
+  }
+}
+
+impl AsSimpleProperty for i64 {
+  fn tag() -> PropertyTag {
+    PropertyTag::Int64Property
+  }
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::Int64Property { value: *self }
+  }
+}
+impl FromProperty for i64 {
+  fn from_property(property: &Property) -> Option<Self> {
+    match property.value {
+      PropertyValue::Int64Property { value } => Some(value),
+      _ => None,
+    }
+  }
+}
+
+impl AsSimpleProperty for f32 {
+  fn tag() -> PropertyTag {
+    PropertyTag::FloatProperty
+  }
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::FloatProperty { value: *self }
+  }
+}
+impl FromProperty for f32 {
+  fn from_property(property: &Property) -> Option<Self> {
+    match property.value {
+      PropertyValue::FloatProperty { value } => Some(value),
+      _ => None,
+    }
+  }
+}
+
+impl AsSimpleProperty for f64 {
+  fn tag() -> PropertyTag {
+    PropertyTag::DoubleProperty
+  }
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::DoubleProperty { value: *self }
+  }
+}
+impl FromProperty for f64 {
+  fn from_property(property: &Property) -> Option<Self> {
+    match property.value {
+      PropertyValue::DoubleProperty { value } => Some(value),
       _ => None,
     }
   }
@@ -246,20 +419,13 @@ where
   }
 }
 
-impl AsProperty for Dependency {
+impl AsSimpleProperty for Dependency {
   fn tag() -> PropertyTag {
     PropertyTag::ObjectProperty
   }
-  fn as_property(&self, name: &str) -> Property {
-    Property {
-      name: name.to_string(),
-      name_variant: 0,
-      tag: Self::tag(),
-      size: 8,
-      tag_data: PropertyTagData::EmptyTag { tag: Self::tag() },
-      value: PropertyValue::ObjectProperty {
-        value: self.clone(),
-      },
+  fn as_simple_property(&self) -> PropertyValue {
+    PropertyValue::ObjectProperty {
+      value: self.clone(),
     }
   }
 }
