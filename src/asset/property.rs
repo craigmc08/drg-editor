@@ -374,8 +374,7 @@ impl PropertyValue {
       PropertyTagData::ArrayTag { value_tag } => {
         let length = read_u32(rdr);
         let mut values = vec![];
-        for i in 0..length {
-          println!("Reading elem {}'s value at {:04X}", i, rdr.position());
+        for _ in 0..length {
           let value = NestedValue::read(value_tag, rdr, names, imports, exports)?;
           values.push(value);
         }
@@ -561,7 +560,6 @@ pub struct Struct {
 
 impl Struct {
   pub fn read(rdr: &mut Cursor<Vec<u8>>, export: &ObjectExport, names: &NameMap, imports: &ObjectImports, exports: &ObjectExports) -> Result<Self, String> {
-    println!("Export starting at {}[{:#04X}]", export.export_file_offset, export.export_file_offset);
     if rdr.position() != export.export_file_offset.into() {
       return Err(
         format!(
@@ -588,7 +586,6 @@ impl Struct {
     let end_pos = rdr.position();
     // The length of all the properties read (including the None)
     let bytes_read = end_pos - start_pos;
-    println!("From {} to {}, read {}/{} bytes and {} properties", start_pos, end_pos, bytes_read, export.serial_size, properties.len());
     let remaining = export.serial_size - bytes_read;
     let extra = read_bytes(rdr, remaining as usize);
     Ok(Self { properties, extra })

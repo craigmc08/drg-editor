@@ -56,7 +56,6 @@ impl Dependency {
         .serialized_index_of(name, *variant)
         .expect("Invalid PreloadDependency export name"),
     };
-    println!("Serialized Dependency {:?} to {}", self, dep_i);
     write_u32(curs, dep_i);
   }
 }

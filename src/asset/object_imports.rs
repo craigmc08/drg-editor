@@ -46,7 +46,7 @@ impl ObjectImport {
     let name = names
       .get_name_obj(&self.name)
       .expect("Invalid ObjectImport name");
-    println!("Serialized ObjectImport: cpkg={} class={} name={}", cpkg.index, class.index, name.index);
+      
     curs.write_u32::<LittleEndian>(cpkg.index).unwrap();
     write_u32(curs, self.cpkg_variant);
     curs.write_u32::<LittleEndian>(class.index).unwrap();

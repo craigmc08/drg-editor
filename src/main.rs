@@ -16,14 +16,6 @@ fn main() {
     let asset_loc: &Path = args[1].as_ref();
     let mut asset = Asset::read_from(asset_loc);
 
-    println!("{:#?}", asset.summary);
-    println!("{:#?}", asset.names);
-    println!("{:#?}", asset.imports);
-    println!("{:#?}", asset.exports);
-    println!("{:#?}", asset.assets);
-    println!("{:#?}", asset.dependencies);
-    println!("{:#?}", asset.structs);
-
     asset.import("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun", Dependency::UObject);
     asset.import("/Script/FSD", "ItemID", "ID_GrapplingGun", Dependency::import("/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun"));
 
