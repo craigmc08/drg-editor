@@ -46,6 +46,7 @@ impl EditorPlugin {
         },
         value: value.clone(),
       }),
+      // TODO this will crash sometimes
       NestedValue::Complex { value } => Self::new(value.as_ref().unwrap()),
     }
   }

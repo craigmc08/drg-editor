@@ -7,9 +7,10 @@ mod support;
 use imgui::*;
 use internal::*;
 use plugins::*;
+use tinyfiledialogs::{open_file_dialog, save_file_dialog_with_filter};
 
-pub fn start_editor(asset: Asset) {
-  let mut editor = Editor::new(asset);
+pub fn start_editor(asset: Option<Asset>) {
+  let mut editor = asset.map(Editor::new);
 
   let system = support::init("DRG Editor");
 
@@ -19,20 +20,93 @@ pub fn start_editor(asset: Asset) {
   })
 }
 
-fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mut Editor) {
+fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mut Option<Editor>) {
   let frame_color = ui.push_style_color(StyleColor::WindowBg, [0.1, 0.1, 0.12, 1.0]);
 
-  draw_imports_editor([0.0, 0.0], [width / 2.0, height / 2.0], ui, editor);
-  draw_exports_selector([width / 2.0, 0.0], [width / 2.0, height / 2.0], ui, editor);
-  draw_property_selector([0.0, height / 2.0], [width / 4.0, height / 2.0], ui, editor);
-  draw_property_editor(
-    [width / 4.0, height / 2.0],
-    [width / 4.0 * 3.0, height / 2.0],
-    ui,
-    editor,
-  );
+  let menu_height = 35.0;
+  let (left, top) = (0.0, menu_height);
+  let (width, height) = (width, height - menu_height);
+
+  draw_menu([0.0, 0.0], [width, menu_height], run, ui, editor);
+
+  match editor {
+    None => {
+      let w = Window::new(im_str!("Message"))
+        .title_bar(false)
+        .resizable(false)
+        .collapsible(false)
+        .movable(false)
+        .scroll_bar(false)
+        .position([left, top], Condition::Always)
+        .size([width, height], Condition::Always);
+      w.build(&ui, || {
+        ui.text("Open a file to start hex modding");
+      });
+    }
+    Some(editor) => {
+      draw_imports_editor([left, top], [width / 2.0, height / 2.0], ui, editor);
+      draw_exports_selector(
+        [left + width / 2.0, top],
+        [width / 2.0, height / 2.0],
+        ui,
+        editor,
+      );
+      draw_property_selector(
+        [left, top + height / 2.0],
+        [width / 4.0, height / 2.0],
+        ui,
+        editor,
+      );
+      draw_property_editor(
+        [left + width / 4.0, top + height / 2.0],
+        [width / 4.0 * 3.0, height / 2.0],
+        ui,
+        editor,
+      );
+    }
+  }
 
   frame_color.pop(ui);
+}
+
+fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mut Option<Editor>) {
+  let w = Window::new(im_str!("Menu"))
+    .title_bar(false)
+    .resizable(false)
+    .collapsible(false)
+    .movable(false)
+    .scroll_bar(false)
+    .position(pos, Condition::Always)
+    .size(size, Condition::Always);
+  w.build(&ui, || {
+    if ui.button(im_str!("Open"), [0.0, 0.0]) {
+      if let Some(fp) = open_file_dialog(
+        "Open Asset",
+        "",
+        Some((&["*.uasset"], "DRG Asset file (*.uasset)")),
+      ) {
+        let asset = Asset::read_from(fp.as_ref());
+        *editor = Some(Editor::new(asset));
+        println!("Opening {}", fp);
+      }
+    }
+    ui.same_line(0.0);
+    if let Some(editor) = editor {
+      // Only show the Save button if a file is opened
+      if ui.button(im_str!("Save As"), [0.0, 0.0]) {
+        if let Some(fp) =
+          save_file_dialog_with_filter("Save Asset", "", &["*.uasset"], "DRG Asset file (*.uasset)")
+        {
+          editor.asset.recalculate_offsets();
+          editor.asset.write_out(fp.as_ref());
+        }
+      }
+      ui.same_line(0.0);
+    }
+    if ui.button(im_str!("Quit"), [0.0, 0.0]) {
+      *run = false;
+    }
+  });
 }
 
 fn draw_imports_editor(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Editor) {

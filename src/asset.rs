@@ -42,10 +42,8 @@ impl Asset {
   pub fn write_out(&self, asset_loc: &Path) -> () {
     let (uasset, uexp) = self.write();
 
-    let mut out_loc = PathBuf::from("out\\");
-    out_loc.push(asset_loc.file_name().unwrap());
-    let uasset_fp = out_loc.with_extension("uasset");
-    let uexp_fp = out_loc.with_extension("uexp");
+    let uasset_fp = asset_loc.with_extension("uasset");
+    let uexp_fp = asset_loc.with_extension("uexp");
 
     std::fs::write(uasset_fp, uasset).unwrap();
     std::fs::write(uexp_fp, uexp).unwrap();
