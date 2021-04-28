@@ -30,14 +30,11 @@ impl Name {
     })
   }
 
-  fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
-    write_string(curs, &self.name);
-    curs
-      .write_u16::<LittleEndian>(self.non_case_preserving_hash)
-      .unwrap();
-    curs
-      .write_u16::<LittleEndian>(self.case_preserving_hash)
-      .unwrap();
+  fn write(&self, curs: &mut Cursor<Vec<u8>>) -> Result<()> {
+    write_string(curs, &self.name)?;
+    curs.write_u16::<LittleEndian>(self.non_case_preserving_hash)?;
+    curs.write_u16::<LittleEndian>(self.case_preserving_hash)?;
+    Ok(())
   }
 }
 
@@ -61,10 +58,11 @@ impl NameMap {
     Ok(NameMap { names })
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> Result<()> {
     for name in self.names.iter() {
-      name.write(curs);
+      name.write(curs)?;
     }
+    Ok(())
   }
 
   pub fn byte_size(&self) -> usize {
@@ -132,12 +130,12 @@ impl NameMap {
     curs: &mut Cursor<Vec<u8>>,
     name: &str,
     variant: u32,
-    rep: &str,
-  ) -> () {
+  ) -> Result<()> {
     let name_n = self
       .get_name_obj(name)
-      .expect(&format!("Name {} for {} not in NameMap", name, rep));
-    write_u32(curs, name_n.index);
-    write_u32(curs, variant);
+      .with_context(|| format!("Name {} is not in names", name))?;
+    write_u32(curs, name_n.index)?;
+    write_u32(curs, variant)?;
+    Ok(())
   }
 }

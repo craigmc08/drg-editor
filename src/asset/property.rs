@@ -98,8 +98,11 @@ impl PropertyTag {
     Self::new(tag.as_ref())
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> () {
-    names.write_name_with_variant(curs, self.to_string(), 0, "PropertyTag");
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<()> {
+    names
+      .write_name_with_variant(curs, self.to_string(), 0)
+      .with_context(|| "PropertyTag")?;
+    Ok(())
   }
 
   pub fn byte_size(&self) -> usize {
@@ -138,7 +141,7 @@ impl PropertyTagData {
   pub fn read(tag: PropertyTag, rdr: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<Self> {
     let data = match tag {
       PropertyTag::BoolProperty => Self::BoolTag {
-        value: rdr.read_u8().unwrap() != 0,
+        value: rdr.read_u8()? != 0,
       },
       PropertyTag::EnumProperty => {
         let (name, name_variant) = names
@@ -171,32 +174,37 @@ impl PropertyTagData {
     Ok(data)
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> () {
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<()> {
     match self {
       Self::EmptyTag { .. } => {}
       Self::BoolTag { value } => {
-        curs.write_u8(if *value { 1 } else { 0 }).unwrap();
+        curs.write_u8(if *value { 1 } else { 0 })?;
       }
       Self::EnumTag { name, name_variant } => {
-        names.write_name_with_variant(curs, name, *name_variant, "EnumTag.name");
+        names
+          .write_name_with_variant(curs, name, *name_variant)
+          .with_context(|| "EnumTag.name")?;
       }
       Self::ArrayTag { value_tag } => {
-        value_tag.write(curs, names);
+        value_tag.write(curs, names)?;
       }
       Self::MapTag { key_tag, value_tag } => {
-        key_tag.write(curs, names);
-        value_tag.write(curs, names);
+        key_tag.write(curs, names)?;
+        value_tag.write(curs, names)?;
       }
       Self::StructTag {
         name,
         name_variant,
         guid,
       } => {
-        names.write_name_with_variant(curs, name, *name_variant, "StructTag.name");
-        curs.write(guid).unwrap();
+        names
+          .write_name_with_variant(curs, name, *name_variant)
+          .with_context(|| "StructTag.name")?;
+        curs.write(guid)?;
       }
     }
-    curs.write(&[0]).unwrap(); // write the null-terminating byte
+    curs.write(&[0])?; // write the null-terminating byte
+    Ok(())
   }
 
   // Includes the null-terminating byte
@@ -287,12 +295,13 @@ impl NestedValue {
     names: &NameMap,
     imports: &ObjectImports,
     exports: &ObjectExports,
-  ) -> () {
+  ) -> Result<()> {
     match self {
       Self::Complex { value: None } => {}
-      Self::Complex { value: Some(prop) } => prop.write(curs, names, imports, exports),
-      Self::Simple { value } => value.write(curs, names, imports, exports),
+      Self::Complex { value: Some(prop) } => prop.write(curs, names, imports, exports)?,
+      Self::Simple { value } => value.write(curs, names, imports, exports)?,
     }
+    Ok(())
   }
 
   pub fn byte_size(&self) -> usize {
@@ -513,27 +522,27 @@ impl PropertyValue {
     names: &NameMap,
     imports: &ObjectImports,
     exports: &ObjectExports,
-  ) -> () {
+  ) -> Result<()> {
     match self {
-      Self::ByteProperty { value } => curs.write_u8(*value).unwrap(),
-      Self::Int8Property { value } => curs.write_i8(*value).unwrap(),
-      Self::Int16Property { value } => curs.write_i16::<LittleEndian>(*value).unwrap(),
-      Self::IntProperty { value } => curs.write_i32::<LittleEndian>(*value).unwrap(),
-      Self::Int64Property { value } => curs.write_i64::<LittleEndian>(*value).unwrap(),
-      Self::UInt16Property { value } => curs.write_u16::<LittleEndian>(*value).unwrap(),
-      Self::UInt32Property { value } => curs.write_u32::<LittleEndian>(*value).unwrap(),
-      Self::UInt64Property { value } => curs.write_u64::<LittleEndian>(*value).unwrap(),
-      Self::FloatProperty { value } => curs.write_f32::<LittleEndian>(*value).unwrap(),
-      Self::DoubleProperty { value } => curs.write_f64::<LittleEndian>(*value).unwrap(),
+      Self::ByteProperty { value } => curs.write_u8(*value)?,
+      Self::Int8Property { value } => curs.write_i8(*value)?,
+      Self::Int16Property { value } => curs.write_i16::<LittleEndian>(*value)?,
+      Self::IntProperty { value } => curs.write_i32::<LittleEndian>(*value)?,
+      Self::Int64Property { value } => curs.write_i64::<LittleEndian>(*value)?,
+      Self::UInt16Property { value } => curs.write_u16::<LittleEndian>(*value)?,
+      Self::UInt32Property { value } => curs.write_u32::<LittleEndian>(*value)?,
+      Self::UInt64Property { value } => curs.write_u64::<LittleEndian>(*value)?,
+      Self::FloatProperty { value } => curs.write_f32::<LittleEndian>(*value)?,
+      Self::DoubleProperty { value } => curs.write_f64::<LittleEndian>(*value)?,
       Self::TextProperty { bytes, value } => {
-        curs.write(bytes).unwrap();
-        write_string(curs, value);
+        curs.write(bytes)?;
+        write_string(curs, value)?;
       }
       Self::NameProperty { name, name_variant } => {
-        names.write_name_with_variant(curs, name, *name_variant, "NameProperty.name");
+        names.write_name_with_variant(curs, name, *name_variant)?;
       }
       Self::ObjectProperty { value } => {
-        value.write(curs, imports, exports);
+        value.write(curs, imports, exports)?;
       }
       Self::SoftObjectProperty {
         object_name,
@@ -542,36 +551,39 @@ impl PropertyValue {
       } => {
         let object_name_n = names
           .get_name_obj(object_name)
-          .expect("Invalid SoftObjectProperty object_name");
-        curs.write_u32::<LittleEndian>(object_name_n.index).unwrap();
-        write_u32(curs, *object_name_variant);
-        write_u32(curs, *unk1);
+          .with_context(|| "SoftObjectProperty.object_name")?;
+        curs.write_u32::<LittleEndian>(object_name_n.index)?;
+        write_u32(curs, *object_name_variant)?;
+        write_u32(curs, *unk1)?;
       }
       Self::BoolProperty {} => {}
       Self::EnumProperty {
         value,
         value_variant,
       } => {
-        names.write_name_with_variant(curs, value, *value_variant, "EnumProperty.value");
+        names
+          .write_name_with_variant(curs, value, *value_variant)
+          .with_context(|| "EnumProperty.value")?;
       }
       Self::ArrayProperty { values } => {
-        write_u32(curs, values.len() as u32);
+        write_u32(curs, values.len() as u32)?;
         for value in values.iter() {
-          value.write(curs, names, imports, exports);
+          value.write(curs, names, imports, exports)?;
         }
       }
       Self::MapProperty { flags, entries } => {
-        write_u32(curs, *flags);
-        write_u32(curs, entries.len() as u32);
+        write_u32(curs, *flags)?;
+        write_u32(curs, entries.len() as u32)?;
         for (key, value) in entries.iter() {
-          key.write(curs, names, imports, exports);
-          value.write(curs, names, imports, exports);
+          key.write(curs, names, imports, exports)?;
+          value.write(curs, names, imports, exports)?;
         }
       }
       Self::StructProperty { data } => {
-        curs.write(&data[..]).unwrap();
+        curs.write(&data[..])?;
       }
     }
+    Ok(())
   }
 
   pub fn byte_size(&self) -> usize {
@@ -687,12 +699,15 @@ impl Property {
     names: &NameMap,
     imports: &ObjectImports,
     exports: &ObjectExports,
-  ) -> () {
-    names.write_name_with_variant(curs, &self.name, self.name_variant, "Property.name");
-    self.tag.write(curs, names);
-    curs.write_u64::<LittleEndian>(self.size).unwrap();
-    self.tag_data.write(curs, names);
-    self.value.write(curs, names, imports, exports);
+  ) -> Result<()> {
+    names
+      .write_name_with_variant(curs, &self.name, self.name_variant)
+      .with_context(|| "Property.name")?;
+    self.tag.write(curs, names)?;
+    curs.write_u64::<LittleEndian>(self.size)?;
+    self.tag_data.write(curs, names)?;
+    self.value.write(curs, names, imports, exports)?;
+    Ok(())
   }
 
   pub fn byte_size(&self) -> usize {
@@ -750,20 +765,22 @@ impl Struct {
     names: &NameMap,
     imports: &ObjectImports,
     exports: &ObjectExports,
-  ) -> () {
+  ) -> Result<()> {
     for prop in self.properties.iter() {
-      prop.write(curs, names, imports, exports);
+      prop.write(curs, names, imports, exports)?;
     }
 
     // Write none property
     let none = names
       .get_name_obj("None")
-      .expect("None should be in names map");
-    curs.write_u32::<LittleEndian>(none.index).unwrap();
-    write_u32(curs, 0); // None name_variant
+      .with_context(|| "None not in names map")?;
+    curs.write_u32::<LittleEndian>(none.index)?;
+    write_u32(curs, 0)?; // None name_variant
 
     // Write extra data
-    curs.write(&self.extra[..]).unwrap();
+    curs.write(&self.extra[..])?;
+
+    Ok(())
   }
 
   pub fn find(&mut self, name: &str) -> Option<&mut Property> {

@@ -31,9 +31,10 @@ impl AssetRegistry {
     return Ok(AssetRegistry { depends, registry });
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
-    curs.write(&self.depends[..]).unwrap();
-    curs.write(&self.registry[..]).unwrap();
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> Result<()> {
+    curs.write(&self.depends[..])?;
+    curs.write(&self.registry[..])?;
+    Ok(())
   }
 
   pub fn byte_size(&self) -> usize {

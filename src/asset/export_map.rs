@@ -94,33 +94,42 @@ impl ObjectExport {
     });
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, _imports: &ObjectImports) -> () {
-    let object_name = names
-      .get_name_obj(&self.object_name)
-      .expect("Invalid ObjectExport object_name");
+  pub fn write(
+    &self,
+    curs: &mut Cursor<Vec<u8>>,
+    names: &NameMap,
+    _imports: &ObjectImports,
+  ) -> Result<()> {
+    let object_name = names.get_name_obj(&self.object_name).with_context(|| {
+      format!(
+        "ObjectExport.object_name {} is not in names",
+        self.object_name
+      )
+    })?;
 
-    write_u32(curs, self.class);
-    curs.write_i32::<LittleEndian>(self.super_index).unwrap();
-    write_u32(curs, self.template);
-    curs.write_i32::<LittleEndian>(self.outer).unwrap();
-    write_u32(curs, object_name.index as u32);
-    write_u32(curs, self.object_name_variant);
-    curs.write_u32::<LittleEndian>(self.object_flags).unwrap();
-    curs.write_u64::<LittleEndian>(self.serial_size).unwrap();
-    write_u32(curs, self.serial_offset);
-    write_bool(curs, self.forced_export);
-    write_bool(curs, self.not_for_client);
-    write_bool(curs, self.not_for_server);
-    write_bool(curs, self.was_filtered);
-    curs.write(&self.package_guid).unwrap();
-    write_u32(curs, self.package_flags);
-    write_bool(curs, self.not_always_loaded_for_editor_game);
-    write_bool(curs, self.is_asset);
-    write_u32(curs, self.first_export_dependency);
-    write_u32(curs, self.serialization_before_serialization_dependencies);
-    write_u32(curs, self.create_before_serialization_dependencies);
-    write_u32(curs, self.serialization_before_create_dependencies);
-    write_u32(curs, self.create_before_create_dependencies);
+    write_u32(curs, self.class)?;
+    curs.write_i32::<LittleEndian>(self.super_index)?;
+    write_u32(curs, self.template)?;
+    curs.write_i32::<LittleEndian>(self.outer)?;
+    write_u32(curs, object_name.index as u32)?;
+    write_u32(curs, self.object_name_variant)?;
+    curs.write_u32::<LittleEndian>(self.object_flags)?;
+    curs.write_u64::<LittleEndian>(self.serial_size)?;
+    write_u32(curs, self.serial_offset)?;
+    write_bool(curs, self.forced_export)?;
+    write_bool(curs, self.not_for_client)?;
+    write_bool(curs, self.not_for_server)?;
+    write_bool(curs, self.was_filtered)?;
+    curs.write(&self.package_guid)?;
+    write_u32(curs, self.package_flags)?;
+    write_bool(curs, self.not_always_loaded_for_editor_game)?;
+    write_bool(curs, self.is_asset)?;
+    write_u32(curs, self.first_export_dependency)?;
+    write_u32(curs, self.serialization_before_serialization_dependencies)?;
+    write_u32(curs, self.create_before_serialization_dependencies)?;
+    write_u32(curs, self.serialization_before_create_dependencies)?;
+    write_u32(curs, self.create_before_create_dependencies)?;
+    Ok(())
   }
 }
 
@@ -155,10 +164,16 @@ impl ObjectExports {
     return Ok(ObjectExports { exports });
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap, imports: &ObjectImports) -> () {
+  pub fn write(
+    &self,
+    curs: &mut Cursor<Vec<u8>>,
+    names: &NameMap,
+    imports: &ObjectImports,
+  ) -> Result<()> {
     for export in self.exports.iter() {
-      export.write(curs, names, imports);
+      export.write(curs, names, imports)?;
     }
+    Ok(())
   }
 
   pub fn serialized_index_of(&self, object: &str, variant: u32) -> Option<u32> {
