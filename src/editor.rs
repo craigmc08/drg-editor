@@ -100,15 +100,32 @@ fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, state: &mut
       }
     }
 
+    ui.same_line(0.0);
+    if let Some(editor) = &mut state.editor {
+      // Only show the Save button if a file is opened
+      if ui.button(im_str!("Save As"), [0.0, 0.0]) {
+        if let Some(fp) =
+          save_file_dialog_with_filter("Save Asset", "", &["*.uasset"], "DRG Asset file (*.uasset)")
+        {
+          editor.asset.recalculate_offsets();
+          match editor.asset.write_out(fp.as_ref()) {
+            Err(err) => {
+              state.err = Some(err);
+              ui.open_popup(im_str!("Error"));
+            }
+            Ok(_) => {}
+          }
+        }
+      }
+      ui.same_line(0.0);
+    }
+
     ui.popup_modal(im_str!("Error")).build(|| {
-      // Make a minimum width
-      // let [x, y] = ui.cursor_pos();
-      // ui.set_cursor_pos([250.0, 0.0]);
-      // ui.set_cursor_pos([x, y]);
       if let Some(err) = &state.err {
         ui.text(format!("{}", err));
-        err.chain().skip(1).for_each(|cause| {
-          ui.text(format!("Cause: {}", cause));
+        ui.text("Caused by:");
+        err.chain().skip(1).enumerate().for_each(|(i, cause)| {
+          ui.text(format!("    {}: {}", i, cause));
         });
         ui.spacing();
         if ui.button(im_str!("Ok"), [0.0, 0.0]) {
@@ -119,19 +136,6 @@ fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, state: &mut
       }
     });
 
-    ui.same_line(0.0);
-    if let Some(editor) = &mut state.editor {
-      // Only show the Save button if a file is opened
-      if ui.button(im_str!("Save As"), [0.0, 0.0]) {
-        if let Some(fp) =
-          save_file_dialog_with_filter("Save Asset", "", &["*.uasset"], "DRG Asset file (*.uasset)")
-        {
-          editor.asset.recalculate_offsets();
-          editor.asset.write_out(fp.as_ref());
-        }
-      }
-      ui.same_line(0.0);
-    }
     if ui.button(im_str!("Quit"), [0.0, 0.0]) {
       *run = false;
     }

@@ -43,23 +43,27 @@ impl ObjectImport {
     });
   }
 
-  fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> () {
-    let cpkg = names
-      .get_name_obj(&self.class_package)
-      .expect("Invalid ObjectImport class_package");
+  fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<()> {
+    let cpkg = names.get_name_obj(&self.class_package).with_context(|| {
+      format!(
+        "ObjectImport.class_package {} is not in names",
+        self.class_package
+      )
+    })?;
     let class = names
       .get_name_obj(&self.class)
-      .expect("Invalid ObjectImport class");
+      .with_context(|| format!("ObjectImport.class {} is not in names", self.class))?;
     let name = names
       .get_name_obj(&self.name)
-      .expect("Invalid ObjectImport name");
-    curs.write_u32::<LittleEndian>(cpkg.index).unwrap();
-    write_u32(curs, self.cpkg_variant);
-    curs.write_u32::<LittleEndian>(class.index).unwrap();
-    write_u32(curs, self.class_variant);
-    curs.write_i32::<LittleEndian>(self.outer_index).unwrap();
-    curs.write_u32::<LittleEndian>(name.index).unwrap();
-    write_u32(curs, self.name_variant);
+      .with_context(|| format!("ObjectImport.name {} is not in names", self.name))?;
+    curs.write_u32::<LittleEndian>(cpkg.index)?;
+    write_u32(curs, self.cpkg_variant)?;
+    curs.write_u32::<LittleEndian>(class.index)?;
+    write_u32(curs, self.class_variant)?;
+    curs.write_i32::<LittleEndian>(self.outer_index)?;
+    curs.write_u32::<LittleEndian>(name.index)?;
+    write_u32(curs, self.name_variant)?;
+    Ok(())
   }
 }
 
@@ -87,10 +91,11 @@ impl ObjectImports {
     return Ok(ObjectImports { objects });
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) {
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<()> {
     for object in self.objects.iter() {
-      object.write(curs, names);
+      object.write(curs, names)?;
     }
+    Ok(())
   }
 
   pub fn byte_size(&self) -> usize {

@@ -17,7 +17,7 @@ pub use property::*;
 use anyhow::*;
 use std::io::prelude::Write;
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub struct Asset {
   pub summary: FileSummary,
@@ -42,14 +42,16 @@ impl Asset {
     Self::read(uasset, uexp)
   }
 
-  pub fn write_out(&self, asset_loc: &Path) -> () {
-    let (uasset, uexp) = self.write();
+  pub fn write_out(&self, asset_loc: &Path) -> Result<()> {
+    let (uasset, uexp) = self.write()?;
 
     let uasset_fp = asset_loc.with_extension("uasset");
     let uexp_fp = asset_loc.with_extension("uexp");
 
-    std::fs::write(uasset_fp, uasset).unwrap();
-    std::fs::write(uexp_fp, uexp).unwrap();
+    std::fs::write(uasset_fp, uasset)?;
+    std::fs::write(uexp_fp, uexp)?;
+
+    Ok(())
   }
 
   pub fn read(uasset: Vec<u8>, uexp: Vec<u8>) -> Result<Self> {
@@ -88,29 +90,50 @@ impl Asset {
     })
   }
 
-  pub fn write(&self) -> (Vec<u8>, Vec<u8>) {
+  pub fn write(&self) -> Result<(Vec<u8>, Vec<u8>)> {
     let mut cursor_uasset = Cursor::new(vec![]);
-    self.summary.write(&mut cursor_uasset);
-    self.names.write(&mut cursor_uasset);
-    self.imports.write(&mut cursor_uasset, &self.names);
+    self
+      .summary
+      .write(&mut cursor_uasset)
+      .with_context(|| "Failed to write file summary")?;
+    self
+      .names
+      .write(&mut cursor_uasset)
+      .with_context(|| "Failed to write names")?;
+    self
+      .imports
+      .write(&mut cursor_uasset, &self.names)
+      .with_context(|| "Failed to write imports")?;
     self
       .exports
-      .write(&mut cursor_uasset, &self.names, &self.imports);
-    self.assets.write(&mut cursor_uasset);
+      .write(&mut cursor_uasset, &self.names, &self.imports)
+      .with_context(|| "Failed to write exports")?;
+    self
+      .assets
+      .write(&mut cursor_uasset)
+      .with_context(|| "Failed to write dependencies or asset registry")?;
     self
       .dependencies
-      .write(&mut cursor_uasset, &self.imports, &self.exports);
+      .write(&mut cursor_uasset, &self.imports, &self.exports)
+      .with_context(|| "Failed to write preload dependencies")?;
 
     let mut cursor_uexp = Cursor::new(vec![]);
-    for strct in self.structs.iter() {
-      strct.write(&mut cursor_uexp, &self.names, &self.imports, &self.exports);
+    for (i, strct) in self.structs.iter().enumerate() {
+      strct
+        .write(&mut cursor_uexp, &self.names, &self.imports, &self.exports)
+        .with_context(|| {
+          format!(
+            "Failed to write struct {}",
+            self.exports.exports[i].object_name
+          )
+        })?;
     }
-    cursor_uexp.write(&self.summary.tag).unwrap();
+    cursor_uexp.write(&self.summary.tag)?;
 
-    return (
+    Ok((
       cursor_uasset.get_ref().clone(),
       cursor_uexp.get_ref().clone(),
-    );
+    ))
   }
 
   pub fn recalculate_offsets(&mut self) -> () {

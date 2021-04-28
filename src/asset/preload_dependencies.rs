@@ -64,17 +64,18 @@ impl Dependency {
     curs: &mut Cursor<Vec<u8>>,
     imports: &ObjectImports,
     exports: &ObjectExports,
-  ) -> () {
+  ) -> Result<()> {
     let dep_i = match self {
       Self::UObject => 0,
       Self::Import(name, variant) => imports
         .serialized_index_of(name, *variant)
-        .expect("Invalid PreloadDependency import name"),
+        .with_context(|| format!("Name {} is not imported", name))?,
       Self::Export(name, variant) => exports
         .serialized_index_of(name, *variant)
-        .expect("Invalid PreloadDependency export name"),
+        .with_context(|| format!("Name {} is not exported", name))?,
     };
-    write_u32(curs, dep_i);
+    write_u32(curs, dep_i)?;
+    Ok(())
   }
 }
 
@@ -117,10 +118,11 @@ impl PreloadDependencies {
     curs: &mut Cursor<Vec<u8>>,
     imports: &ObjectImports,
     exports: &ObjectExports,
-  ) -> () {
+  ) -> Result<()> {
     for dep in self.dependencies.iter() {
-      dep.write(curs, imports, exports);
+      dep.write(curs, imports, exports)?;
     }
+    Ok(())
   }
 
   pub fn byte_size(&self) -> usize {

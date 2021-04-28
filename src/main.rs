@@ -3,7 +3,6 @@ pub mod bindings;
 pub mod editor;
 pub mod util;
 
-use anyhow::*;
 use asset::*;
 use editor::*;
 use std::env;
@@ -33,7 +32,13 @@ fn main() {
             }
             Ok(asset) => {
                 asset.recalculate_offsets();
-                asset.write_out("out/out.uasset".as_ref());
+                match asset.write_out("out/out.uasset".as_ref()) {
+                    Err(err) => {
+                        println!("Failed to write asset");
+                        println!("{:?}", err);
+                    }
+                    Ok(_) => {}
+                }
             }
         }
 

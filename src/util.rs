@@ -19,7 +19,7 @@ pub fn read_bytes<T: TryFrom<Vec<u8>>>(rdr: &mut Cursor<Vec<u8>>, len: usize) ->
   rdr.read_exact(&mut buf)?;
   match T::try_from(buf) {
     Ok(t) => Ok(t),
-    Err(e) => bail!("read_bytes({}) failed to convert to desired type", len),
+    Err(_) => bail!("read_bytes({}) failed to convert to desired type", len),
   }
 }
 
@@ -39,17 +39,20 @@ pub fn read_bool(rdr: &mut Cursor<Vec<u8>>) -> Result<bool> {
   Ok(read_u32(rdr)? != 0)
 }
 
-pub fn write_u32(curs: &mut Cursor<Vec<u8>>, val: u32) -> () {
-  curs.write_u32::<LittleEndian>(val).unwrap();
+pub fn write_u32(curs: &mut Cursor<Vec<u8>>, val: u32) -> Result<()> {
+  curs.write_u32::<LittleEndian>(val)?;
+  Ok(())
 }
 
-pub fn write_string(curs: &mut Cursor<Vec<u8>>, string: &str) -> () {
+pub fn write_string(curs: &mut Cursor<Vec<u8>>, string: &str) -> Result<()> {
   let length = string.len() + 1;
-  write_u32(curs, length as u32);
-  curs.write(string.as_bytes()).unwrap();
-  curs.write(&[0]).unwrap();
+  write_u32(curs, length as u32)?;
+  curs.write(string.as_bytes())?;
+  curs.write(&[0])?;
+  Ok(())
 }
 
-pub fn write_bool(curs: &mut Cursor<Vec<u8>>, val: bool) -> () {
-  write_u32(curs, if val { 1 } else { 0 });
+pub fn write_bool(curs: &mut Cursor<Vec<u8>>, val: bool) -> Result<()> {
+  write_u32(curs, if val { 1 } else { 0 })?;
+  Ok(())
 }
