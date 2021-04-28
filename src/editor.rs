@@ -263,7 +263,7 @@ fn draw_property_selector(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut E
         .exports
         .iter()
         .position(|x| &x.object_name == selected)
-        .expect("Invalid selected export (this is a bug in the program)");
+        .expect("Invalid selected export. Report this crash to the maintainer.");
       let strct = &editor.asset.structs[idx];
       for prop in &strct.properties {
         let active =

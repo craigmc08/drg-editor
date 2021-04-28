@@ -21,6 +21,9 @@ pub enum PluginType {
   PluginFloat {
     value: f32,
   },
+  PluginInt {
+    value: i32,
+  },
 }
 
 impl PluginType {
@@ -33,6 +36,7 @@ impl PluginType {
       }
       Self::PluginBool { value } => value.as_property(original.name.clone()),
       Self::PluginFloat { value } => value.as_property(original.name.clone()),
+      Self::PluginInt { value } => value.as_property(original.name.clone()),
     }
   }
 }
@@ -77,6 +81,7 @@ impl EditorPlugin {
         }
       }
       PropertyValue::FloatProperty { value } => PluginType::PluginFloat { value: *value },
+      PropertyValue::IntProperty { value } => PluginType::PluginInt { value: *value },
       _ => PluginType::PluginNone {
         reason: format!("Unsupported property type {:?}", property.tag),
       },
@@ -147,6 +152,11 @@ impl EditorPlugin {
       PluginType::PluginFloat { value } => {
         let prev = *value;
         ui.input_float(im_str!("Float"), value).build();
+        prev != *value
+      }
+      PluginType::PluginInt { value } => {
+        let prev = *value;
+        ui.input_int(im_str!("Int"), value).build();
         prev != *value
       }
     }
