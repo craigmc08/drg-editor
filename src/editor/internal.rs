@@ -21,7 +21,7 @@ impl Default for EditableImport {
 }
 
 pub struct SelectedProperty {
-  pub name: String,
+  pub name: NameVariant,
   pub dirty: bool,
   pub struct_idx: usize,
   pub plugin: EditorPlugin,
@@ -35,8 +35,8 @@ pub struct State {
 pub struct Editor {
   pub asset: Asset,
   pub new_import: Option<EditableImport>,
-  pub selected_import: Option<String>,
-  pub selected_export: Option<String>,
+  pub selected_import: Option<NameVariant>,
+  pub selected_export: Option<NameVariant>,
   pub selected_property: Option<SelectedProperty>,
 }
 
@@ -58,8 +58,8 @@ pub fn input_dependency(ui: &Ui, label: &str, dep: Dependency) -> Option<Depende
 
   let (prev_item, prev_name) = match dep {
     Dependency::UObject => (0, "".to_string()),
-    Dependency::Import(name, _) => (1, name.clone()),
-    Dependency::Export(name, _) => (2, name.clone()),
+    Dependency::Import(name) => (1, name.to_string()),
+    Dependency::Export(name) => (2, name.to_string()),
   };
 
   let mut current_item = prev_item;
@@ -74,25 +74,25 @@ pub fn input_dependency(ui: &Ui, label: &str, dep: Dependency) -> Option<Depende
     changed = true;
     new_dep = match current_item {
       0 => Dependency::uobject(),
-      1 => Dependency::import(&prev_name),
-      2 => Dependency::export(&prev_name),
+      1 => Dependency::import(prev_name),
+      2 => Dependency::export(prev_name),
       _ => unreachable!(),
     }
   }
 
   new_dep = match new_dep {
     Dependency::UObject => Dependency::uobject(),
-    Dependency::Import(name, _) => {
-      let mut new_name = ImString::new(&name);
+    Dependency::Import(name) => {
+      let mut new_name = ImString::new(name.to_string());
       new_name.reserve(64);
       ui.input_text(&ImString::new(label), &mut new_name).build();
-      changed = changed || new_name != ImString::from(name);
+      changed = changed || new_name != ImString::from(name.to_string());
       Dependency::import(new_name.as_ref())
     }
-    Dependency::Export(name, _) => {
-      let mut new_name = ImString::new(&name);
+    Dependency::Export(name) => {
+      let mut new_name = ImString::new(name.to_string());
       ui.input_text(&ImString::new(label), &mut new_name).build();
-      changed = changed || new_name != ImString::from(name);
+      changed = changed || new_name != ImString::from(name.to_string());
       Dependency::export(new_name.as_ref())
     }
   };

@@ -162,7 +162,7 @@ fn draw_imports_editor(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edit
       for import in editor.asset.list_imports() {
         let active = Some(import.name.clone()) == editor.selected_import;
 
-        if ui.radio_button_bool(&ImString::from(import.name.clone()), active) {
+        if ui.radio_button_bool(&ImString::from(import.name.to_string()), active) {
           editor.selected_import = Some(import.name.clone());
         }
       }
@@ -237,7 +237,7 @@ fn draw_exports_selector(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Ed
     for export in editor.asset.list_exports() {
       let active = Some(export.clone()) == editor.selected_export;
 
-      if ui.radio_button_bool(&ImString::from(export.clone()), active) {
+      if ui.radio_button_bool(&ImString::from(export.to_string()), active) {
         if !active {
           // The selected export is changing, so have to deselect the property
           editor.selected_export = Some(export.clone());
@@ -266,8 +266,9 @@ fn draw_property_selector(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut E
         .expect("Invalid selected export (this is a bug in the program)");
       let strct = &editor.asset.structs[idx];
       for prop in &strct.properties {
-        let active = Some(&prop.name) == editor.selected_property.as_ref().map(|s| &s.name);
-        if ui.radio_button_bool(&ImString::from(prop.name.clone()), active) && !active {
+        let active =
+          Some(prop.name.clone()) == editor.selected_property.as_ref().map(|s| s.name.clone());
+        if ui.radio_button_bool(&ImString::from(prop.name.to_string()), active) && !active {
           editor.selected_property = Some(SelectedProperty {
             name: prop.name.clone(),
             dirty: false,
@@ -294,7 +295,7 @@ fn draw_property_editor(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edi
       if selected.dirty {
         ui.text(ImString::from(format!("*{}", selected.name)));
       } else {
-        ui.text(ImString::from(selected.name.clone()));
+        ui.text(ImString::from(selected.name.to_string()));
       }
       ui.same_line(0.0);
       if ui.button(im_str!("Save"), [0.0, 0.0]) {

@@ -7,16 +7,16 @@ use std::io::Cursor;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Dependency {
   UObject,
-  Import(String, u32),
-  Export(String, u32),
+  Import(NameVariant),
+  Export(NameVariant),
 }
 
 impl Dependency {
-  pub fn import(name: &str) -> Self {
-    Self::Import(name.to_string(), 0)
+  pub fn import<T: Into<NameVariant>>(name: T) -> Self {
+    Self::Import(name.into())
   }
-  pub fn export(name: &str) -> Self {
-    Self::Export(name.to_string(), 0)
+  pub fn export<T: Into<NameVariant>>(name: T) -> Self {
+    Self::Export(name.into())
   }
   pub fn uobject() -> Self {
     Self::UObject
@@ -25,13 +25,12 @@ impl Dependency {
   pub fn serialize(&self, imports: &ObjectImports, exports: &ObjectExports) -> i32 {
     match self {
       Self::UObject => 0,
-      Self::Import(name, variant) => imports
-        .index_of(name, *variant)
+      Self::Import(name) => imports
+        .index_of(name)
         .expect("Invalid Dependency::Import name"),
-      Self::Export(name, variant) => exports
-        .serialized_index_of(name, *variant)
-        .expect("Invalid Dependency::Export export name")
-        as i32,
+      Self::Export(name) => exports
+        .serialized_index_of(name)
+        .expect("Invalid Dependency::Export export name") as i32,
     }
   }
 
@@ -40,13 +39,10 @@ impl Dependency {
       Ok(Self::UObject)
     } else if idx < 0 {
       let import = imports.lookup((-idx - 1) as u64)?;
-      Ok(Self::Import(import.name.clone(), import.name_variant))
+      Ok(Self::Import(import.name.clone()))
     } else {
       let export = exports.lookup((idx - 1) as u64)?;
-      Ok(Self::Export(
-        export.object_name.clone(),
-        export.object_name_variant,
-      ))
+      Ok(Self::Export(export.object_name.clone()))
     }
   }
 
@@ -67,11 +63,11 @@ impl Dependency {
   ) -> Result<()> {
     let dep_i = match self {
       Self::UObject => 0,
-      Self::Import(name, variant) => imports
-        .serialized_index_of(name, *variant)
+      Self::Import(name) => imports
+        .serialized_index_of(name)
         .with_context(|| format!("Name {} is not imported", name))?,
-      Self::Export(name, variant) => exports
-        .serialized_index_of(name, *variant)
+      Self::Export(name) => exports
+        .serialized_index_of(name)
         .with_context(|| format!("Name {} is not exported", name))?,
     };
     write_u32(curs, dep_i)?;
@@ -132,13 +128,9 @@ impl PreloadDependencies {
 
   // TODO check for duplicates
   pub fn add_import(&mut self, name: &str) -> () {
-    self
-      .dependencies
-      .push(Dependency::Import(name.to_string(), 0));
+    self.dependencies.push(Dependency::import(name));
   }
   pub fn add_export(&mut self, name: &str) -> () {
-    self
-      .dependencies
-      .push(Dependency::Export(name.to_string(), 0));
+    self.dependencies.push(Dependency::export(name));
   }
 }

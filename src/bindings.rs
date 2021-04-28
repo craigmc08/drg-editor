@@ -2,8 +2,8 @@ use crate::asset::*;
 
 /// Represents a value that can be turned into a named property
 pub trait AsProperty {
-  fn as_property(&self, name: &str) -> Property;
-  fn as_nested_value(&self, name: &str) -> NestedValue {
+  fn as_property<T: Into<NameVariant>>(&self, name: T) -> Property;
+  fn as_nested_value<T: Into<NameVariant>>(&self, name: T) -> NestedValue {
     let prop = self.as_property(name);
     if prop.tag.is_complex_array_value() {
       NestedValue::Complex { value: Some(prop) }
@@ -17,7 +17,7 @@ pub trait AsProperty {
 // known tag. Use this to implement [`AsProperty`] with less boilerplate.
 pub trait IsProperty {
   fn tag() -> PropertyTag;
-  fn to_property(&self, name: &str) -> Property;
+  fn to_property<T: Into<NameVariant>>(&self, name: T) -> Property;
 }
 
 /// For properties without `tag_data`, you can use this trait to implement
@@ -34,11 +34,10 @@ where
   fn tag() -> PropertyTag {
     <Self as IsSimpleProperty>::tag()
   }
-  fn to_property(&self, name: &str) -> Property {
+  fn to_property<U: Into<NameVariant>>(&self, name: U) -> Property {
     let value = self.to_simple_property();
     Property {
-      name: name.to_string(),
-      name_variant: 0,
+      name: name.into(),
       tag: Self::tag(),
       size: value.byte_size() as u64,
       tag_data: PropertyTagData::EmptyTag { tag: Self::tag() },
@@ -51,8 +50,8 @@ impl<T> AsProperty for T
 where
   T: IsProperty,
 {
-  fn as_property(&self, name: &str) -> Property {
-    self.to_property(name)
+  fn as_property<U: Into<NameVariant>>(&self, name: U) -> Property {
+    self.to_property(name.into())
   }
 }
 
@@ -69,8 +68,7 @@ where
     match value {
       NestedValue::Complex { value } => value.as_ref().and_then(|prop| Self::from_property(prop)),
       NestedValue::Simple { value } => Self::from_property(&Property {
-        name: "".to_string(),
-        name_variant: 0,
+        name: NameVariant::new("", 0),
         tag: PropertyTag::ByteProperty,
         tag_data: PropertyTagData::EmptyTag {
           tag: PropertyTag::ByteProperty,
@@ -97,7 +95,7 @@ impl Struct {
   /// Get the value of a property by name
   pub fn get<T: FromProperty>(&self, name: &str) -> Option<T> {
     for prop in self.properties.iter() {
-      if prop.name == name {
+      if prop.name == NameVariant::parse(name) {
         return T::from_property(prop);
       }
     }
@@ -106,7 +104,8 @@ impl Struct {
 
   /// Set the value of a property by name
   pub fn set<T: AsProperty>(&mut self, name: &str, value: T) -> () {
-    let new_prop = value.as_property(name);
+    let name = NameVariant::parse(name);
+    let new_prop = value.as_property(name.clone());
     match self.properties.iter().position(|prop| prop.name == name) {
       None => {
         self.properties.push(new_prop);
@@ -135,10 +134,14 @@ impl Asset {
   /// asset.import("/Script/FSD", "ItemID", "ID_GrapplingGun", Dependency::Import("/Game/WeaponsNTools/GrapplingGun/ID_Grappling");
   /// ```
   pub fn import(&mut self, class_package: &str, class: &str, name: &str, outer: Dependency) -> () {
-    // Ensure the names are imported
-    self.names.add(class_package);
-    self.names.add(class);
-    self.names.add(name);
+    let class_package = NameVariant::parse(class_package);
+    let class = NameVariant::parse(class);
+    let name = NameVariant::parse(name);
+
+    // Ensure the base names are imported
+    self.names.add(&class_package.name);
+    self.names.add(&class.name);
+    self.names.add(&name.name);
 
     match self
       .imports
@@ -177,7 +180,7 @@ impl Asset {
   }
 
   /// List the names of all exports
-  pub fn list_exports(&self) -> Vec<String> {
+  pub fn list_exports(&self) -> Vec<NameVariant> {
     self
       .exports
       .exports
@@ -190,6 +193,7 @@ impl Asset {
   ///
   /// To borrow the Struct as mutable, see [Self::get_struct_mut]
   pub fn get_struct(&self, name: &str) -> Option<&Struct> {
+    let name = NameVariant::parse(name);
     match self
       .exports
       .exports
@@ -203,6 +207,7 @@ impl Asset {
 
   /// Attempt to borrow as mutable an exported Struct by name.
   pub fn get_struct_mut(&mut self, name: &str) -> Option<&mut Struct> {
+    let name = NameVariant::parse(name);
     match self
       .exports
       .exports
@@ -230,10 +235,9 @@ impl IsProperty for bool {
   fn tag() -> PropertyTag {
     PropertyTag::BoolProperty
   }
-  fn to_property(&self, name: &str) -> Property {
+  fn to_property<T: Into<NameVariant>>(&self, name: T) -> Property {
     Property {
-      name: name.to_string(),
-      name_variant: 0,
+      name: name.into(),
       tag: Self::tag(),
       size: 0,
       tag_data: PropertyTagData::BoolTag { value: *self },
@@ -427,11 +431,14 @@ impl FromProperty for f64 {
 /// Panics if the vector is empty.
 ///
 /// It produces a broken property if the tags of each T are not the same.
-pub fn vec_as_property_unsafe<T: AsProperty>(vec: &Vec<T>, name: &str) -> Property {
+pub fn vec_as_property_unsafe<T: AsProperty>(vec: &Vec<T>, name: NameVariant) -> Property {
   if vec.len() < 1 {
     panic!();
   }
-  let values: Vec<NestedValue> = vec.iter().map(|t| t.as_nested_value(name)).collect();
+  let values: Vec<NestedValue> = vec
+    .iter()
+    .map(|t| t.as_nested_value(name.clone()))
+    .collect();
   let value_tag = match &values[0] {
     NestedValue::Complex { value: Some(value) } => value.tag,
     NestedValue::Simple { value } => value.tag(),
@@ -439,8 +446,7 @@ pub fn vec_as_property_unsafe<T: AsProperty>(vec: &Vec<T>, name: &str) -> Proper
   };
   let size = values.iter().map(|nv| nv.byte_size()).sum::<usize>() + 4;
   Property {
-    name: name.to_string(),
-    name_variant: 0,
+    name,
     tag: PropertyTag::ArrayProperty,
     size: size as u64,
     tag_data: PropertyTagData::ArrayTag { value_tag },
@@ -455,15 +461,19 @@ where
   fn tag() -> PropertyTag {
     PropertyTag::ArrayProperty
   }
-  fn to_property(&self, name: &str) -> Property {
+  fn to_property<U: Into<NameVariant>>(&self, name: U) -> Property {
+    let name = name.into();
     let tag_data = PropertyTagData::ArrayTag {
       value_tag: T::tag(),
     };
-    let array: Vec<NestedValue> = self.iter().map(|t| t.as_nested_value(name)).collect();
+    // TODO: what name to past to children?
+    let array: Vec<NestedValue> = self
+      .iter()
+      .map(|t| t.as_nested_value(name.clone()))
+      .collect();
     let size = array.iter().map(|nv| nv.byte_size()).sum::<usize>() + 4;
     Property {
-      name: name.to_string(),
-      name_variant: 0,
+      name,
       tag: Self::tag(),
       size: size as u64,
       tag_data,

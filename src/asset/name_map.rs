@@ -12,11 +12,6 @@ pub struct Name {
   pub case_preserving_hash: u16,     // ditto
 }
 
-#[derive(Debug)]
-pub struct NameMap {
-  pub names: Vec<Name>,
-}
-
 impl Name {
   fn read(rdr: &mut Cursor<Vec<u8>>) -> Result<Self> {
     let name = read_string(rdr)?;
@@ -36,6 +31,83 @@ impl Name {
     curs.write_u16::<LittleEndian>(self.case_preserving_hash)?;
     Ok(())
   }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct NameVariant {
+  pub name: String,
+  pub variant: u32,
+}
+
+impl Into<NameVariant> for String {
+  fn into(self) -> NameVariant {
+    NameVariant::parse(&self)
+  }
+}
+impl Into<NameVariant> for &str {
+  fn into(self) -> NameVariant {
+    NameVariant::parse(self)
+  }
+}
+
+impl NameVariant {
+  pub fn new(name: &str, variant: u32) -> Self {
+    Self {
+      name: name.to_string(),
+      variant,
+    }
+  }
+
+  /// Parses a string to a NameVariant
+  ///
+  /// Strings like SomeName_6 are turned into a NameVariant with variant = 6.
+  pub fn parse(txt: &str) -> Self {
+    let pieces: Vec<&str> = txt.split('_').collect();
+    let len = pieces.len();
+    if len > 1 {
+      if let Ok(variant) = pieces[len - 1].parse::<u32>() {
+        let name: String = pieces[0..len - 1].concat();
+        return Self { name, variant };
+      }
+    }
+    let name: String = pieces.concat();
+    Self { name, variant: 0 }
+  }
+
+  pub fn read(rdr: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<Self> {
+    let start_pos = rdr.position();
+    let index = rdr.read_u32::<LittleEndian>()?;
+    let name = names
+      .lookup(index)
+      .map(|x| x.name.clone())
+      .with_context(|| format!("Failed parsing NameVariant starting at {:#X}", start_pos))?;
+    let variant = read_u32(rdr)?;
+    Ok(Self { name, variant })
+  }
+
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<()> {
+    let name_n = names
+      .get_name_obj(&self.name)
+      .with_context(|| format!("Name {} is not in names", self))?;
+    write_u32(curs, name_n.index)?;
+    write_u32(curs, self.variant)?;
+    Ok(())
+  }
+}
+
+impl std::fmt::Display for NameVariant {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    if self.variant != 0 {
+      write!(f, "{}_{}", self.name, self.variant)
+    } else {
+      write!(f, "{}", self.name)
+    }
+  }
+}
+
+#[derive(Debug)]
+pub struct NameMap {
+  pub names: Vec<Name>,
 }
 
 impl NameMap {
@@ -83,15 +155,15 @@ impl NameMap {
     return None;
   }
 
-  pub fn lookup(&self, index: u32) -> Result<&Name, String> {
+  pub fn lookup(&self, index: u32) -> Result<&Name> {
     if index > self.names.len() as u32 {
-      return Err(format!(
-        "Name index {} is not in NameMap (length {})",
+      bail!(
+        "Name index {} is not in names (length {})",
         index,
         self.names.len()
-      ));
+      );
     }
-    return Ok(&self.names[index as usize]);
+    Ok(&self.names[index as usize])
   }
 
   pub fn add(&mut self, name: &str) -> bool {
@@ -117,25 +189,5 @@ impl NameMap {
       Err(err) => bail!("{} at {:04X}", err, rdr.position()),
       Ok(x) => Ok(x),
     }
-  }
-
-  pub fn read_name_with_variant(&self, rdr: &mut Cursor<Vec<u8>>) -> Result<(String, u32)> {
-    let name = self.read_name(rdr)?;
-    let variant = read_u32(rdr)?;
-    Ok((name, variant))
-  }
-
-  pub fn write_name_with_variant(
-    &self,
-    curs: &mut Cursor<Vec<u8>>,
-    name: &str,
-    variant: u32,
-  ) -> Result<()> {
-    let name_n = self
-      .get_name_obj(name)
-      .with_context(|| format!("Name {} is not in names", name))?;
-    write_u32(curs, name_n.index)?;
-    write_u32(curs, variant)?;
-    Ok(())
   }
 }

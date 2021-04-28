@@ -27,10 +27,12 @@ impl PluginType {
   fn to_property(&self, original: &Property) -> Property {
     match self {
       Self::PluginNone { .. } => original.clone(),
-      Self::PluginObject { dep } => dep.as_property(&original.name),
-      Self::PluginArray { sub_editors, .. } => vec_as_property_unsafe(sub_editors, &original.name),
-      Self::PluginBool { value } => value.as_property(&original.name),
-      Self::PluginFloat { value } => value.as_property(&original.name),
+      Self::PluginObject { dep } => dep.as_property(original.name.clone()),
+      Self::PluginArray { sub_editors, .. } => {
+        vec_as_property_unsafe(sub_editors, original.name.clone())
+      }
+      Self::PluginBool { value } => value.as_property(original.name.clone()),
+      Self::PluginFloat { value } => value.as_property(original.name.clone()),
     }
   }
 }
@@ -154,8 +156,7 @@ impl EditorPlugin {
     match nv {
       NestedValue::Simple { value } => Some(Self::new(&Property {
         // Every field except value doesn't matter
-        name: "".to_string(),
-        name_variant: 0,
+        name: "".into(),
         tag: PropertyTag::ByteProperty,
         size: 0,
         tag_data: PropertyTagData::EmptyTag {
@@ -180,7 +181,7 @@ impl EditorPlugin {
 }
 
 impl AsProperty for EditorPlugin {
-  fn as_property(&self, _name: &str) -> Property {
+  fn as_property<T: Into<NameVariant>>(&self, _name: T) -> Property {
     self.plugin.to_property(&self.original)
   }
 }

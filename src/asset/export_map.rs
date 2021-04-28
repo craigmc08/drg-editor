@@ -7,12 +7,11 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct ObjectExport {
-  pub class: u32,          // just storing u32 because idc what this is
-  pub super_index: i32,    // not sure what this represents
-  pub template: u32,       // just storing u32 because idc what this is
-  pub outer: i32,          // again, idk
-  pub object_name: String, // stored as index into name_map
-  pub object_name_variant: u32,
+  pub class: u32,       // just storing u32 because idc what this is
+  pub super_index: i32, // not sure what this represents
+  pub template: u32,    // just storing u32 because idc what this is
+  pub outer: i32,       // again, idk
+  pub object_name: NameVariant,
   pub object_flags: u32,       // just some bytes
   pub serial_size: u64, // size of uexp struct, 4 bytes of padding after this are incorporated into the value?
   pub serial_offset: u32, // same as file_summary.total_header_size
@@ -48,9 +47,7 @@ impl ObjectExport {
     let super_index = rdr.read_i32::<LittleEndian>()?;
     let template = read_u32(rdr)?;
     let outer = rdr.read_i32::<LittleEndian>()?;
-    let (object_name, object_name_variant) = names
-      .read_name_with_variant(rdr)
-      .with_context(|| format!("object_name"))?;
+    let object_name = NameVariant::read(rdr, names).with_context(|| "object_name")?;
     let object_flags = rdr.read_u32::<LittleEndian>()?;
     let serial_size = rdr.read_u64::<LittleEndian>()?;
     let serial_offset = read_u32(rdr)?;
@@ -73,7 +70,6 @@ impl ObjectExport {
       template,
       outer,
       object_name,
-      object_name_variant,
       object_flags,
       serial_size,
       serial_offset,
@@ -100,19 +96,14 @@ impl ObjectExport {
     names: &NameMap,
     _imports: &ObjectImports,
   ) -> Result<()> {
-    let object_name = names.get_name_obj(&self.object_name).with_context(|| {
-      format!(
-        "ObjectExport.object_name {} is not in names",
-        self.object_name
-      )
-    })?;
-
     write_u32(curs, self.class)?;
     curs.write_i32::<LittleEndian>(self.super_index)?;
     write_u32(curs, self.template)?;
     curs.write_i32::<LittleEndian>(self.outer)?;
-    write_u32(curs, object_name.index as u32)?;
-    write_u32(curs, self.object_name_variant)?;
+    self
+      .object_name
+      .write(curs, names)
+      .with_context(|| "object_name")?;
     curs.write_u32::<LittleEndian>(self.object_flags)?;
     curs.write_u64::<LittleEndian>(self.serial_size)?;
     write_u32(curs, self.serial_offset)?;
@@ -176,10 +167,10 @@ impl ObjectExports {
     Ok(())
   }
 
-  pub fn serialized_index_of(&self, object: &str, variant: u32) -> Option<u32> {
+  pub fn serialized_index_of(&self, object: &NameVariant) -> Option<u32> {
     let mut i: u32 = 0;
     for export in self.exports.iter() {
-      if export.object_name == object && export.object_name_variant == variant {
+      if export.object_name == *object {
         return Some(i + 1);
       }
       i += 1;

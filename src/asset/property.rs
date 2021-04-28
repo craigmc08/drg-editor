@@ -92,16 +92,15 @@ impl PropertyTag {
 
   pub fn read(rdr: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<Self> {
     let start_pos = rdr.position();
-    let (tag, _) = names
-      .read_name_with_variant(rdr)
+    let tag = NameVariant::read(rdr, names)
       .with_context(|| format!("Property tag starting at {:#X}", start_pos))?;
-    Self::new(tag.as_ref())
+    Self::new(&tag.to_string())
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<()> {
-    names
-      .write_name_with_variant(curs, self.to_string(), 0)
-      .with_context(|| "PropertyTag")?;
+    NameVariant::parse(self.to_string())
+      .write(curs, names)
+      .with_context(|| "Property tag")?;
     Ok(())
   }
 
@@ -119,8 +118,7 @@ pub enum PropertyTagData {
     value: bool,
   },
   EnumTag {
-    name: String,
-    name_variant: u32,
+    name: NameVariant,
   },
   ArrayTag {
     value_tag: PropertyTag,
@@ -130,8 +128,7 @@ pub enum PropertyTagData {
     value_tag: PropertyTag,
   },
   StructTag {
-    name: String,
-    name_variant: u32,
+    name: NameVariant,
     guid: [u8; 16],
   },
 }
@@ -144,10 +141,8 @@ impl PropertyTagData {
         value: rdr.read_u8()? != 0,
       },
       PropertyTag::EnumProperty => {
-        let (name, name_variant) = names
-          .read_name_with_variant(rdr)
-          .with_context(|| "EnumTag.name")?;
-        Self::EnumTag { name, name_variant }
+        let name = NameVariant::read(rdr, names).with_context(|| "EnumTag.name")?;
+        Self::EnumTag { name }
       }
       PropertyTag::ArrayProperty => Self::ArrayTag {
         value_tag: PropertyTag::read(rdr, names)?,
@@ -158,15 +153,9 @@ impl PropertyTagData {
         Self::MapTag { key_tag, value_tag }
       }
       PropertyTag::StructProperty => {
-        let (name, name_variant) = names
-          .read_name_with_variant(rdr)
-          .with_context(|| "Struct.name")?;
+        let name = NameVariant::read(rdr, names).with_context(|| "StructTag.name")?;
         let guid: [u8; 16] = read_bytes(rdr, 16)?;
-        Self::StructTag {
-          name,
-          name_variant,
-          guid,
-        }
+        Self::StructTag { name, guid }
       }
       _ => Self::EmptyTag { tag },
     };
@@ -180,10 +169,8 @@ impl PropertyTagData {
       Self::BoolTag { value } => {
         curs.write_u8(if *value { 1 } else { 0 })?;
       }
-      Self::EnumTag { name, name_variant } => {
-        names
-          .write_name_with_variant(curs, name, *name_variant)
-          .with_context(|| "EnumTag.name")?;
+      Self::EnumTag { name } => {
+        name.write(curs, names).with_context(|| "EnumTag.name")?;
       }
       Self::ArrayTag { value_tag } => {
         value_tag.write(curs, names)?;
@@ -192,14 +179,8 @@ impl PropertyTagData {
         key_tag.write(curs, names)?;
         value_tag.write(curs, names)?;
       }
-      Self::StructTag {
-        name,
-        name_variant,
-        guid,
-      } => {
-        names
-          .write_name_with_variant(curs, name, *name_variant)
-          .with_context(|| "StructTag.name")?;
+      Self::StructTag { name, guid } => {
+        name.write(curs, names).with_context(|| "StructTag.name")?;
         curs.write(guid)?;
       }
     }
@@ -350,12 +331,10 @@ pub enum PropertyValue {
     value: String,
   },
   NameProperty {
-    name: String,
-    name_variant: u32,
+    name: NameVariant,
   },
   EnumProperty {
-    value: String,
-    value_variant: u32,
+    value: NameVariant,
   },
   ArrayProperty {
     values: Vec<NestedValue>,
@@ -371,8 +350,7 @@ pub enum PropertyValue {
     data: Vec<u8>,
   },
   SoftObjectProperty {
-    object_name: String,
-    object_name_variant: u32,
+    object_name: NameVariant,
     unk1: u32,
   },
 }
@@ -447,10 +425,8 @@ impl PropertyValue {
       PropertyTagData::EmptyTag {
         tag: PropertyTag::NameProperty,
       } => {
-        let (name, name_variant) = names
-          .read_name_with_variant(rdr)
-          .with_context(|| "NameProperty.name")?;
-        Ok(Self::NameProperty { name, name_variant })
+        let name = NameVariant::read(rdr, names).with_context(|| "NameProperty.name")?;
+        Ok(Self::NameProperty { name })
       }
       PropertyTagData::EmptyTag {
         tag: PropertyTag::ObjectProperty,
@@ -461,15 +437,10 @@ impl PropertyValue {
       PropertyTagData::EmptyTag {
         tag: PropertyTag::SoftObjectProperty,
       } => {
-        let (object_name, object_name_variant) = names
-          .read_name_with_variant(rdr)
-          .with_context(|| "SoftObjectProperty.object_name")?;
+        let object_name =
+          NameVariant::read(rdr, names).with_context(|| "SoftObjectProperty.object_name")?;
         let unk1 = read_u32(rdr)?;
-        Ok(Self::SoftObjectProperty {
-          object_name,
-          object_name_variant,
-          unk1,
-        })
+        Ok(Self::SoftObjectProperty { object_name, unk1 })
       }
 
       PropertyTagData::EmptyTag { tag } => {
@@ -478,13 +449,8 @@ impl PropertyValue {
 
       PropertyTagData::BoolTag { .. } => Ok(Self::BoolProperty {}),
       PropertyTagData::EnumTag { .. } => {
-        let (value, value_variant) = names
-          .read_name_with_variant(rdr)
-          .with_context(|| "EnumProperty.value")?;
-        Ok(Self::EnumProperty {
-          value,
-          value_variant,
-        })
+        let value = NameVariant::read(rdr, names).with_context(|| "EnumProperty.value")?;
+        Ok(Self::EnumProperty { value })
       }
       PropertyTagData::ArrayTag { value_tag } => {
         let length = read_u32(rdr)?;
@@ -538,31 +504,24 @@ impl PropertyValue {
         curs.write(bytes)?;
         write_string(curs, value)?;
       }
-      Self::NameProperty { name, name_variant } => {
-        names.write_name_with_variant(curs, name, *name_variant)?;
+      Self::NameProperty { name } => {
+        name
+          .write(curs, names)
+          .with_context(|| "NameProperty.name")?;
       }
       Self::ObjectProperty { value } => {
         value.write(curs, imports, exports)?;
       }
-      Self::SoftObjectProperty {
-        object_name,
-        object_name_variant,
-        unk1,
-      } => {
-        let object_name_n = names
-          .get_name_obj(object_name)
+      Self::SoftObjectProperty { object_name, unk1 } => {
+        object_name
+          .write(curs, names)
           .with_context(|| "SoftObjectProperty.object_name")?;
-        curs.write_u32::<LittleEndian>(object_name_n.index)?;
-        write_u32(curs, *object_name_variant)?;
         write_u32(curs, *unk1)?;
       }
       Self::BoolProperty {} => {}
-      Self::EnumProperty {
-        value,
-        value_variant,
-      } => {
-        names
-          .write_name_with_variant(curs, value, *value_variant)
+      Self::EnumProperty { value } => {
+        value
+          .write(curs, names)
           .with_context(|| "EnumProperty.value")?;
       }
       Self::ArrayProperty { values } => {
@@ -650,12 +609,10 @@ impl PropertyValue {
 
 #[derive(Debug, Clone)]
 pub struct Property {
-  pub name: String, // u632 index into name_map
-  pub name_variant: u32,
+  pub name: NameVariant,
   pub tag: PropertyTag,
   pub size: u64,
   pub tag_data: PropertyTagData,
-  // 1 byte of padding?
   pub value: PropertyValue,
 }
 
@@ -666,8 +623,8 @@ impl Property {
     imports: &ObjectImports,
     exports: &ObjectExports,
   ) -> Result<Option<Self>> {
-    let (name, name_variant) = names.read_name_with_variant(rdr).with_context(|| "name")?;
-    if &name == "None" {
+    let name = NameVariant::read(rdr, names).with_context(|| "Property.name")?;
+    if name == NameVariant::parse("None") {
       return Ok(None);
     }
 
@@ -685,7 +642,6 @@ impl Property {
     // }
     return Ok(Some(Property {
       name,
-      name_variant,
       tag,
       size,
       tag_data,
@@ -700,8 +656,9 @@ impl Property {
     imports: &ObjectImports,
     exports: &ObjectExports,
   ) -> Result<()> {
-    names
-      .write_name_with_variant(curs, &self.name, self.name_variant)
+    self
+      .name
+      .write(curs, names)
       .with_context(|| "Property.name")?;
     self.tag.write(curs, names)?;
     curs.write_u64::<LittleEndian>(self.size)?;
@@ -785,7 +742,7 @@ impl Struct {
 
   pub fn find(&mut self, name: &str) -> Option<&mut Property> {
     for prop in self.properties.iter_mut() {
-      if prop.name == name {
+      if prop.name == NameVariant::parse(name) {
         return Some(prop);
       }
     }
