@@ -66,12 +66,14 @@ impl NameVariant {
     let len = pieces.len();
     if len > 1 {
       if let Ok(variant) = pieces[len - 1].parse::<u32>() {
-        let name: String = pieces[0..len - 1].concat();
+        let name: String = pieces[0..len - 1].join("_");
         return Self { name, variant };
       }
     }
-    let name: String = pieces.concat();
-    Self { name, variant: 0 }
+    Self {
+      name: txt.to_string(),
+      variant: 0,
+    }
   }
 
   pub fn read(rdr: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<Self> {
