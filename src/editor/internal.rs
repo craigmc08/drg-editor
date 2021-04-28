@@ -9,44 +9,6 @@ pub struct EditableImport {
   pub outer: Dependency,
 }
 
-impl EditableImport {
-  pub fn name(&self) -> String {
-    self.name.to_string()
-  }
-
-  pub fn from(import: &ObjectImport, editor: &Editor) -> Self {
-    let mut new = Self {
-      class_package: ImString::from(import.class_package.clone()),
-      class: ImString::from(import.class.clone()),
-      name: ImString::from(import.name.clone()),
-      outer: Dependency::deserialize(
-        import.outer_index,
-        &editor.asset.imports,
-        &editor.asset.exports,
-      )
-      .expect("Invalid Import.outer"),
-    };
-    new.class_package.reserve(64);
-    new.class.reserve(64);
-    new.name.reserve(64);
-    new
-  }
-
-  pub fn to_import(&self, editor: &Editor) -> ObjectImport {
-    ObjectImport {
-      class_package: self.class_package.to_string(),
-      cpkg_variant: 0,
-      class: self.class.to_string(),
-      class_variant: 0,
-      name: self.name.to_string(),
-      name_variant: 0,
-      outer_index: self
-        .outer
-        .serialize(&editor.asset.imports, &editor.asset.exports),
-    }
-  }
-}
-
 impl Default for EditableImport {
   fn default() -> Self {
     EditableImport {

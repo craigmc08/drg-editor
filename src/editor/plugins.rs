@@ -6,7 +6,7 @@ use imgui::*;
 
 pub enum PluginType {
   PluginNone {
-    tag: PropertyTag,
+    reason: String,
   },
   PluginObject {
     dep: Dependency,
@@ -33,10 +33,10 @@ pub struct EditorPlugin {
 }
 
 impl EditorPlugin {
-  fn new_from_nv(nv: &NestedValue) -> Self {
+  fn new_from_nv(nv: &NestedValue) -> Option<Self> {
     match nv {
-      NestedValue::Simple { value } => Self::new(&Property {
-        // All properties but value don't matter
+      NestedValue::Simple { value } => Some(Self::new(&Property {
+        // Every field except value doesn't matter
         name: "".to_string(),
         name_variant: 0,
         tag: PropertyTag::ByteProperty,
@@ -45,9 +45,9 @@ impl EditorPlugin {
           tag: PropertyTag::ByteProperty,
         },
         value: value.clone(),
-      }),
-      // TODO this will crash sometimes
-      NestedValue::Complex { value } => Self::new(value.as_ref().unwrap()),
+      })),
+      NestedValue::Complex { value: Some(value) } => Some(Self::new(value)),
+      NestedValue::Complex { .. } => None,
     }
   }
   pub fn new(property: &Property) -> Self {
@@ -55,18 +55,30 @@ impl EditorPlugin {
       PropertyValue::ObjectProperty { value } => PluginType::PluginObject { dep: value.clone() },
       PropertyValue::ArrayProperty { values } => {
         if let PropertyTagData::ArrayTag { value_tag } = property.tag_data {
+          let mut sub_editors = vec![];
+          for editor in values.iter().map(EditorPlugin::new_from_nv) {
+            if let Some(editor) = editor {
+              sub_editors.push(editor);
+            } else {
+              return EditorPlugin {
+                original: property.clone(),
+                plugin: PluginType::PluginNone {
+                  reason: format!("Empty value in array"),
+                },
+              };
+            }
+          }
           PluginType::PluginArray {
             value_tag,
-            sub_editors: values
-              .iter()
-              .map(|nv| EditorPlugin::new_from_nv(nv))
-              .collect(),
+            sub_editors,
           }
         } else {
           unreachable!()
         }
       }
-      _ => PluginType::PluginNone { tag: property.tag },
+      _ => PluginType::PluginNone {
+        reason: format!("Unsupported property type {:?}", property.tag),
+      },
     };
     EditorPlugin {
       original: property.clone(),
@@ -87,8 +99,8 @@ impl EditorPlugin {
   /// Returns true if a change was made
   pub fn input(&mut self, ui: &Ui, assets: &Asset) -> bool {
     match &mut self.plugin {
-      PluginType::PluginNone { tag } => {
-        ui.text(format!("Unsupported property type {}", tag.to_string()));
+      PluginType::PluginNone { reason } => {
+        ui.text(format!("Can't edit {}: {}", self.original.name, reason));
         false
       }
       PluginType::PluginObject { dep } => {
@@ -130,7 +142,9 @@ impl EditorPlugin {
         // Add button
         if ui.button(im_str!("Add Element"), [0.0, 0.0]) {
           changed = true;
-          sub_editors.push(EditorPlugin::new_from_nv(&NestedValue::new(*value_tag)));
+          if let Some(sub_editor) = EditorPlugin::new_from_nv(&NestedValue::new(*value_tag)) {
+            sub_editors.push(sub_editor);
+          }
         }
 
         changed
@@ -140,7 +154,7 @@ impl EditorPlugin {
 }
 
 impl AsProperty for EditorPlugin {
-  fn as_property(&self, name: &str) -> Property {
+  fn as_property(&self, _name: &str) -> Property {
     self.plugin.to_property(&self.original)
   }
 }
