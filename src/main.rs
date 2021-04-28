@@ -3,6 +3,7 @@ pub mod bindings;
 pub mod editor;
 pub mod util;
 
+use anyhow::*;
 use asset::*;
 use editor::*;
 use std::env;
@@ -25,9 +26,16 @@ fn main() {
     if args.len() == 3 && args[1] == "test" {
         // Testing mode
 
-        let mut asset = Asset::read_from(args[2].as_ref());
-        asset.recalculate_offsets();
-        asset.write_out("out/out.uasset".as_ref());
+        match &mut Asset::read_from(args[2].as_ref()) {
+            Err(err) => {
+                println!("Failed to read asset");
+                println!("{:?}", err);
+            }
+            Ok(asset) => {
+                asset.recalculate_offsets();
+                asset.write_out("out/out.uasset".as_ref());
+            }
+        }
 
         return;
     }
@@ -39,5 +47,5 @@ fn main() {
     } else {
         None
     };
-    start_editor(asset);
+    start_editor(asset.map(|x| x.unwrap()));
 }

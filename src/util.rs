@@ -1,29 +1,42 @@
+use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
+use std::convert::TryFrom;
 use std::io::prelude::*;
 use std::io::Cursor;
 
-pub fn read_bytes(rdr: &mut Cursor<Vec<u8>>, len: usize) -> Vec<u8> {
-  let buf = &mut (vec![0; len]);
-  rdr.read_exact(buf).unwrap();
-  return buf.to_vec();
+/// Reads a number of bytes to some type.
+///
+/// A common use would be to read n bytes to an n-length slice, ex:
+///
+/// ```
+/// let guid: [u8; 16] = read_bytes(rdr, 16);
+/// ```
+///
+/// Note that the length of the slice and the nubmer of bytes read should be
+/// the same, otherwise the function call can fail.
+pub fn read_bytes<T: TryFrom<Vec<u8>>>(rdr: &mut Cursor<Vec<u8>>, len: usize) -> Result<T> {
+  let mut buf = vec![0; len];
+  rdr.read_exact(&mut buf)?;
+  match T::try_from(buf) {
+    Ok(t) => Ok(t),
+    Err(e) => bail!("read_bytes({}) failed to convert to desired type", len),
+  }
 }
 
-pub fn read_u32(rdr: &mut Cursor<Vec<u8>>) -> u32 {
-  rdr.read_u32::<LittleEndian>().unwrap()
+pub fn read_u32(rdr: &mut Cursor<Vec<u8>>) -> Result<u32> {
+  Ok(rdr.read_u32::<LittleEndian>()?)
 }
 
-/**
- * Reads a length-prefixed, null-terminated string
- */
-pub fn read_string(rdr: &mut Cursor<Vec<u8>>) -> String {
-  let length = read_u32(rdr) as usize;
-  let chars = read_bytes(rdr, length - 1);
+/// Reads a length-prefixed, null-terminated string
+pub fn read_string(rdr: &mut Cursor<Vec<u8>>) -> Result<String> {
+  let length = read_u32(rdr)? as usize;
+  let chars = read_bytes(rdr, length - 1)?;
   rdr.consume(1); // Skip the 0 terminator
-  return String::from_utf8(chars).unwrap();
+  Ok(String::from_utf8(chars)?)
 }
 
-pub fn read_bool(rdr: &mut Cursor<Vec<u8>>) -> bool {
-  read_u32(rdr) != 0
+pub fn read_bool(rdr: &mut Cursor<Vec<u8>>) -> Result<bool> {
+  Ok(read_u32(rdr)? != 0)
 }
 
 pub fn write_u32(curs: &mut Cursor<Vec<u8>>, val: u32) -> () {

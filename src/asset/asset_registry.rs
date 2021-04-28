@@ -1,5 +1,6 @@
 use crate::asset::*;
 use crate::util::*;
+use anyhow::*;
 use std::io::prelude::*;
 use std::io::Cursor;
 
@@ -11,24 +12,21 @@ pub struct AssetRegistry {
 }
 
 impl AssetRegistry {
-  pub fn read(rdr: &mut Cursor<Vec<u8>>, summary: &FileSummary) -> Result<Self, String> {
+  pub fn read(rdr: &mut Cursor<Vec<u8>>, summary: &FileSummary) -> Result<Self> {
     // Asset registry actually contains both Depends and AssetsRegistry
     if rdr.position() != summary.depends_offset.into() {
-      return Err(
-        format!(
-          "Error parsing AssetRegistry: Expected to be at position {:04X}, but I'm at position {:04X}",
-          summary.depends_offset,
-          rdr.position()
-        )
-        .to_string(),
+      bail!(
+        "Wrong asset registry starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
+        summary.depends_offset,
+        rdr.position(),
       );
     }
 
     let depends_len = (summary.asset_registry_data_offset - summary.depends_offset) as usize;
-    let depends = read_bytes(rdr, depends_len);
+    let depends = read_bytes(rdr, depends_len)?;
     let assets_len =
       (summary.preload_dependency_offset - summary.asset_registry_data_offset) as usize;
-    let registry = read_bytes(rdr, assets_len);
+    let registry = read_bytes(rdr, assets_len)?;
 
     return Ok(AssetRegistry { depends, registry });
   }

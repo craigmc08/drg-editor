@@ -1,5 +1,6 @@
 use crate::asset::*;
 use crate::util::*;
+use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 
@@ -17,16 +18,16 @@ pub struct NameMap {
 }
 
 impl Name {
-  fn read(rdr: &mut Cursor<Vec<u8>>) -> Self {
-    let name = read_string(rdr);
-    let non_case_preserving_hash = rdr.read_u16::<LittleEndian>().unwrap();
-    let case_preserving_hash = rdr.read_u16::<LittleEndian>().unwrap();
-    return Name {
+  fn read(rdr: &mut Cursor<Vec<u8>>) -> Result<Self> {
+    let name = read_string(rdr)?;
+    let non_case_preserving_hash = rdr.read_u16::<LittleEndian>()?;
+    let case_preserving_hash = rdr.read_u16::<LittleEndian>()?;
+    Ok(Name {
       index: 0,
       name,
       non_case_preserving_hash,
       case_preserving_hash,
-    };
+    })
   }
 
   fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
@@ -41,25 +42,23 @@ impl Name {
 }
 
 impl NameMap {
-  pub fn read(rdr: &mut Cursor<Vec<u8>>, summary: &FileSummary) -> Result<Self, String> {
+  pub fn read(rdr: &mut Cursor<Vec<u8>>, summary: &FileSummary) -> Result<Self> {
     if rdr.position() != summary.name_offset.into() {
-      return Err(
-        format!(
-          "Error parsing NameMap: Expected to be at position {:04X}, but I'm at position {:04X}",
-          summary.name_offset,
-          rdr.position()
-        )
-        .to_string(),
+      bail!(
+        "Wrong name map starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
+        summary.name_offset, rdr.position()
       );
     }
 
     let mut names = vec![];
     for i in 0..summary.name_count {
-      let mut name = Name::read(rdr);
+      let start_pos = rdr.position();
+      let mut name = Name::read(rdr)
+        .with_context(|| format!("Failed to parse name starting at {:#X}", start_pos))?;
       name.index = i.into();
       names.push(name);
     }
-    return Ok(NameMap { names });
+    Ok(NameMap { names })
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
@@ -86,12 +85,11 @@ impl NameMap {
     return None;
   }
 
-  pub fn lookup(&self, index: u32, rep: &str) -> Result<&Name, String> {
+  pub fn lookup(&self, index: u32) -> Result<&Name, String> {
     if index > self.names.len() as u32 {
       return Err(format!(
-        "Name {} for {} is not in NameMap (length {})",
+        "Name index {} is not in NameMap (length {})",
         index,
-        rep,
         self.names.len()
       ));
     }
@@ -115,21 +113,17 @@ impl NameMap {
     return true;
   }
 
-  pub fn read_name(&self, rdr: &mut Cursor<Vec<u8>>, rep: &str) -> Result<String, String> {
-    let index = rdr.read_u32::<LittleEndian>().unwrap();
-    match self.lookup(index, rep).map(|x| x.name.clone()) {
-      Err(err) => Err(format!("{} at {:04X}", err, rdr.position())),
+  pub fn read_name(&self, rdr: &mut Cursor<Vec<u8>>) -> Result<String> {
+    let index = rdr.read_u32::<LittleEndian>()?;
+    match self.lookup(index).map(|x| x.name.clone()) {
+      Err(err) => bail!("{} at {:04X}", err, rdr.position()),
       Ok(x) => Ok(x),
     }
   }
 
-  pub fn read_name_with_variant(
-    &self,
-    rdr: &mut Cursor<Vec<u8>>,
-    rep: &str,
-  ) -> Result<(String, u32), String> {
-    let name = self.read_name(rdr, rep)?;
-    let variant = read_u32(rdr);
+  pub fn read_name_with_variant(&self, rdr: &mut Cursor<Vec<u8>>) -> Result<(String, u32)> {
+    let name = self.read_name(rdr)?;
+    let variant = read_u32(rdr)?;
     Ok((name, variant))
   }
 
