@@ -1,5 +1,6 @@
 use crate::asset::*;
 use crate::util::*;
+use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::Cursor;
 
@@ -34,18 +35,14 @@ impl Dependency {
     }
   }
 
-  pub fn deserialize(
-    idx: i32,
-    imports: &ObjectImports,
-    exports: &ObjectExports,
-  ) -> Result<Self, String> {
+  pub fn deserialize(idx: i32, imports: &ObjectImports, exports: &ObjectExports) -> Result<Self> {
     if idx == 0 {
       Ok(Self::UObject)
     } else if idx < 0 {
-      let import = imports.lookup((-idx - 1) as u64, "Dependency::deserialize")?;
+      let import = imports.lookup((-idx - 1) as u64)?;
       Ok(Self::Import(import.name.clone(), import.name_variant))
     } else {
-      let export = exports.lookup((idx - 1) as u64, "Dependency::deserialize")?;
+      let export = exports.lookup((idx - 1) as u64)?;
       Ok(Self::Export(
         export.object_name.clone(),
         export.object_name_variant,
@@ -57,27 +54,9 @@ impl Dependency {
     rdr: &mut Cursor<Vec<u8>>,
     imports: &ObjectImports,
     exports: &ObjectExports,
-  ) -> Result<Self, String> {
-    let idx = rdr.read_i32::<LittleEndian>().unwrap();
+  ) -> Result<Self> {
+    let idx = rdr.read_i32::<LittleEndian>()?;
     Self::deserialize(idx, imports, exports)
-    // if idx == 0 {
-    //   Ok(Self::UObject)
-    // } else if (idx & 0x80000000) > 0 {
-    //   let import = imports.lookup(
-    //     (std::u32::MAX - idx) as u64,
-    //     &format!("PreloadDependency import @ {:04X}", rdr.position()),
-    //   )?;
-    //   Ok(Self::Import(import.name.clone(), import.name_variant))
-    // } else {
-    //   let export = exports.lookup(
-    //     (idx - 1) as u64,
-    //     &format!("PreloadDependency export @ {:04X}", rdr.position()),
-    //   )?;
-    //   Ok(Self::Export(
-    //     export.object_name.clone(),
-    //     export.object_name_variant,
-    //   ))
-    // }
   }
 
   pub fn write(
@@ -113,21 +92,20 @@ impl PreloadDependencies {
     summary: &FileSummary,
     imports: &ObjectImports,
     exports: &ObjectExports,
-  ) -> Result<Self, String> {
+  ) -> Result<Self> {
     if rdr.position() != summary.preload_dependency_offset.into() {
-      return Err(
-        format!(
-          "Error parsing PreloadDependencies: Expected to be at position {:04X}, but I'm at position {:04X}",
-          summary.preload_dependency_offset,
-          rdr.position()
-        )
-        .to_string(),
+      bail!(
+        "Wrong exports dependency position: Expected to be at position {:#X}, but I'm at position {:#X}",
+        summary.preload_dependency_offset,
+        rdr.position(),
       );
     }
 
     let mut dependencies = vec![];
     for _ in 0..summary.preload_dependency_count {
-      let dependency = Dependency::read(rdr, imports, exports)?;
+      let start_pos = rdr.position();
+      let dependency = Dependency::read(rdr, imports, exports)
+        .with_context(|| format!("Failed to parse dependency starting at {:#X}", start_pos))?;
       dependencies.push(dependency);
     }
 

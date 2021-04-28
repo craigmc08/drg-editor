@@ -65,6 +65,11 @@ pub struct SelectedProperty {
   pub plugin: EditorPlugin,
 }
 
+pub struct State {
+  pub editor: Option<Editor>,
+  pub err: Option<anyhow::Error>,
+}
+
 pub struct Editor {
   pub asset: Asset,
   pub new_import: Option<EditableImport>,

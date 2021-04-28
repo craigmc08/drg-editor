@@ -14,6 +14,7 @@ pub use object_imports::*;
 pub use preload_dependencies::*;
 pub use property::*;
 
+use anyhow::*;
 use std::io::prelude::Write;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -29,12 +30,14 @@ pub struct Asset {
 }
 
 impl Asset {
-  pub fn read_from(asset_loc: &Path) -> Self {
+  pub fn read_from(asset_loc: &Path) -> Result<Self> {
     let uasset_fp = asset_loc.with_extension("uasset");
     let uexp_fp = asset_loc.with_extension("uexp");
 
-    let uasset = std::fs::read(uasset_fp).unwrap();
-    let uexp = std::fs::read(uexp_fp).unwrap();
+    let uasset = std::fs::read(uasset_fp.clone())
+      .with_context(|| format!("Failed to read uasset from {:?}", uasset_fp))?;
+    let uexp = std::fs::read(uexp_fp.clone())
+      .with_context(|| format!("Failed to read uexp from {:?}", uexp_fp))?;
 
     Self::read(uasset, uexp)
   }
@@ -49,25 +52,32 @@ impl Asset {
     std::fs::write(uexp_fp, uexp).unwrap();
   }
 
-  pub fn read(uasset: Vec<u8>, uexp: Vec<u8>) -> Self {
+  pub fn read(uasset: Vec<u8>, uexp: Vec<u8>) -> Result<Self> {
     let mut cursor_uasset = Cursor::new(uasset);
-    let summary = FileSummary::read(&mut cursor_uasset);
-    let names = NameMap::read(&mut cursor_uasset, &summary).unwrap();
-    let imports = ObjectImports::read(&mut cursor_uasset, &summary, &names).unwrap();
-    let exports = ObjectExports::read(&mut cursor_uasset, &summary, &names, &imports).unwrap();
-    let assets = AssetRegistry::read(&mut cursor_uasset, &summary).unwrap();
-    let dependencies =
-      PreloadDependencies::read(&mut cursor_uasset, &summary, &imports, &exports).unwrap();
+    let summary =
+      FileSummary::read(&mut cursor_uasset).with_context(|| format!("Failed to read summary"))?;
+    let names = NameMap::read(&mut cursor_uasset, &summary)
+      .with_context(|| format!("Failed to read names"))?;
+    let imports = ObjectImports::read(&mut cursor_uasset, &summary, &names)
+      .with_context(|| format!("Failed to read imports"))?;
+    let exports = ObjectExports::read(&mut cursor_uasset, &summary, &names, &imports)
+      .with_context(|| format!("Failed to read exports"))?;
+    let assets = AssetRegistry::read(&mut cursor_uasset, &summary)
+      .with_context(|| format!("Failed to read dependencies or asset registry"))?;
+    let dependencies = PreloadDependencies::read(&mut cursor_uasset, &summary, &imports, &exports)
+      .with_context(|| format!("Failed to read preload dependencies"))?;
 
     let mut cursor_uexp = Cursor::new(uexp);
     // Read all export structs
     let mut structs = vec![];
     for export in exports.exports.iter() {
-      let strct = Struct::read(&mut cursor_uexp, export, &names, &imports, &exports).unwrap();
+      let start_pos = cursor_uexp.position();
+      let strct = Struct::read(&mut cursor_uexp, export, &names, &imports, &exports)
+        .with_context(|| format!("Failed to read struct starting at {:#X}", start_pos))?;
       structs.push(strct);
     }
 
-    return Asset {
+    Ok(Asset {
       summary,
       names,
       imports,
@@ -75,7 +85,7 @@ impl Asset {
       assets,
       dependencies,
       structs,
-    };
+    })
   }
 
   pub fn write(&self) -> (Vec<u8>, Vec<u8>) {

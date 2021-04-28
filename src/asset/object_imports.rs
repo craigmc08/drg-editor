@@ -1,5 +1,6 @@
 use crate::asset::*;
 use crate::util::*;
+use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 
@@ -20,12 +21,17 @@ pub struct ObjectImports {
 }
 
 impl ObjectImport {
-  fn read(rdr: &mut Cursor<Vec<u8>>, name_map: &NameMap) -> Result<Self, String> {
-    let (class_package, cpkg_variant) =
-      name_map.read_name_with_variant(rdr, "ObjectImport.class_package")?;
-    let (class, class_variant) = name_map.read_name_with_variant(rdr, "ObjectImport.class")?;
-    let outer_index = rdr.read_i32::<LittleEndian>().unwrap();
-    let (name, name_variant) = name_map.read_name_with_variant(rdr, "ObjectImport.name")?;
+  fn read(rdr: &mut Cursor<Vec<u8>>, name_map: &NameMap) -> Result<Self> {
+    let (class_package, cpkg_variant) = name_map
+      .read_name_with_variant(rdr)
+      .with_context(|| "For class_package")?;
+    let (class, class_variant) = name_map
+      .read_name_with_variant(rdr)
+      .with_context(|| "For class")?;
+    let outer_index = rdr.read_i32::<LittleEndian>()?;
+    let (name, name_variant) = name_map
+      .read_name_with_variant(rdr)
+      .with_context(|| "For name")?;
     return Ok(ObjectImport {
       class_package,
       cpkg_variant,
@@ -62,21 +68,20 @@ impl ObjectImports {
     rdr: &mut Cursor<Vec<u8>>,
     summary: &FileSummary,
     name_map: &NameMap,
-  ) -> Result<Self, String> {
+  ) -> Result<Self> {
     if rdr.position() != summary.import_offset.into() {
-      return Err(
-        format!(
-          "Error parsing ObjectImports: Expected to be at position {:04X}, but I'm at position {:04X}",
-          summary.import_offset,
-          rdr.position()
-        )
-        .to_string(),
+      bail!(
+        "Wrong imports starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
+        summary.import_offset,
+        rdr.position(),
       );
     }
 
     let mut objects = vec![];
     for _ in 0..summary.import_count {
-      let object = ObjectImport::read(rdr, name_map)?;
+      let start_pos = rdr.position();
+      let object = ObjectImport::read(rdr, name_map)
+        .with_context(|| format!("Failed to parse import starting at {:#X}", start_pos))?;
       objects.push(object);
     }
     return Ok(ObjectImports { objects });
@@ -108,14 +113,13 @@ impl ObjectImports {
     self.index_of(object, variant).map(|i| i as u32)
   }
 
-  pub fn lookup(&self, index: u64, rep: &str) -> Result<&ObjectImport, String> {
+  pub fn lookup(&self, index: u64) -> Result<&ObjectImport> {
     if index > self.objects.len() as u64 {
-      return Err(format!(
-        "Import {} for {} is not in ObjectImports (length {})",
+      bail!(
+        "Import index {} is not in imports (length {})",
         index,
-        rep,
         self.objects.len()
-      ));
+      );
     }
     return Ok(&self.objects[index as usize]);
   }
@@ -141,12 +145,9 @@ impl ObjectImports {
     return Some(-(len as i32) - 1);
   }
 
-  pub fn read_import(&self, rdr: &mut Cursor<Vec<u8>>, rep: &str) -> Result<String, String> {
-    let index_raw = rdr.read_u32::<LittleEndian>().unwrap();
+  pub fn read_import(&self, rdr: &mut Cursor<Vec<u8>>) -> Result<String> {
+    let index_raw = rdr.read_u32::<LittleEndian>()?;
     let index = std::u32::MAX - index_raw; // import indices are stored as -index - 1, for some reason
-    match self.lookup(index.into(), rep).map(|x| x.name.clone()) {
-      Err(err) => Err(format!("{} at {:04X}", err, rdr.position())),
-      Ok(x) => Ok(x),
-    }
+    Ok(self.lookup(index.into()).map(|x| x.name.clone())?)
   }
 }

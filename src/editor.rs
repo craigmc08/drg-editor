@@ -10,26 +10,29 @@ use plugins::*;
 use tinyfiledialogs::{open_file_dialog, save_file_dialog_with_filter};
 
 pub fn start_editor(asset: Option<Asset>) {
-  let mut editor = asset.map(Editor::new);
+  let mut state = State {
+    editor: asset.map(Editor::new),
+    err: None,
+  };
 
   let system = support::init("DRG Editor");
 
   system.main_loop(move |(width, height), run, ui| {
     let dims = (width as f32, height as f32);
-    draw_editor(dims, run, ui, &mut editor);
+    draw_editor(dims, run, ui, &mut state);
   })
 }
 
-fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mut Option<Editor>) {
+fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, state: &mut State) {
   let frame_color = ui.push_style_color(StyleColor::WindowBg, [0.1, 0.1, 0.12, 1.0]);
 
   let menu_height = 35.0;
   let (left, top) = (0.0, menu_height);
   let (width, height) = (width, height - menu_height);
 
-  draw_menu([0.0, 0.0], [width, menu_height], run, ui, editor);
+  draw_menu([0.0, 0.0], [width, menu_height], run, ui, state);
 
-  match editor {
+  match &mut state.editor {
     None => {
       let w = Window::new(im_str!("Message"))
         .title_bar(false)
@@ -69,7 +72,7 @@ fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mu
   frame_color.pop(ui);
 }
 
-fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mut Option<Editor>) {
+fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, state: &mut State) {
   let w = Window::new(im_str!("Menu"))
     .title_bar(false)
     .resizable(false)
@@ -85,13 +88,39 @@ fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mu
         "",
         Some((&["*.uasset"], "DRG Asset file (*.uasset)")),
       ) {
-        let asset = Asset::read_from(fp.as_ref());
-        *editor = Some(Editor::new(asset));
-        println!("Opening {}", fp);
+        match Asset::read_from(fp.as_ref()) {
+          Err(err) => {
+            state.err = Some(err);
+            ui.open_popup(im_str!("Error"));
+          }
+          Ok(asset) => {
+            state.editor = Some(Editor::new(asset));
+          }
+        }
       }
     }
+
+    ui.popup_modal(im_str!("Error")).build(|| {
+      // Make a minimum width
+      // let [x, y] = ui.cursor_pos();
+      // ui.set_cursor_pos([250.0, 0.0]);
+      // ui.set_cursor_pos([x, y]);
+      if let Some(err) = &state.err {
+        ui.text(format!("{}", err));
+        err.chain().skip(1).for_each(|cause| {
+          ui.text(format!("Cause: {}", cause));
+        });
+        ui.spacing();
+        if ui.button(im_str!("Ok"), [0.0, 0.0]) {
+          ui.close_current_popup();
+        }
+      } else {
+        ui.close_current_popup();
+      }
+    });
+
     ui.same_line(0.0);
-    if let Some(editor) = editor {
+    if let Some(editor) = &mut state.editor {
       // Only show the Save button if a file is opened
       if ui.button(im_str!("Save As"), [0.0, 0.0]) {
         if let Some(fp) =

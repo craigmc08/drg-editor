@@ -1,6 +1,6 @@
 use crate::util::*;
+use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::convert::TryInto;
 use std::io::prelude::*;
 use std::io::Cursor;
 
@@ -60,13 +60,13 @@ pub struct FileSummary {
 }
 
 impl Generation {
-  fn read(rdr: &mut Cursor<Vec<u8>>) -> Self {
-    let export_count = read_u32(rdr);
-    let name_count = read_u32(rdr);
-    Generation {
+  fn read(rdr: &mut Cursor<Vec<u8>>) -> Result<Self> {
+    let export_count = read_u32(rdr)?;
+    let name_count = read_u32(rdr)?;
+    Ok(Generation {
       export_count,
       name_count,
-    }
+    })
   }
 
   fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {
@@ -74,13 +74,13 @@ impl Generation {
     write_u32(curs, self.name_count);
   }
 
-  fn read_array(rdr: &mut Cursor<Vec<u8>>) -> Vec<Generation> {
-    let length = read_u32(rdr);
+  fn read_array(rdr: &mut Cursor<Vec<u8>>) -> Result<Vec<Generation>> {
+    let length = read_u32(rdr)?;
     let mut generations: Vec<Generation> = vec![];
     for _ in 0..length {
-      generations.push(Self::read(rdr));
+      generations.push(Self::read(rdr)?);
     }
-    return generations;
+    Ok(generations)
   }
 
   fn write_array(gens: &Vec<Generation>, curs: &mut Cursor<Vec<u8>>) -> () {
@@ -92,45 +92,45 @@ impl Generation {
 }
 
 impl FileSummary {
-  pub fn read(rdr: &mut Cursor<Vec<u8>>) -> Self {
-    let tag = read_bytes(rdr, 4);
-    let file_version_ue4 = read_u32(rdr);
-    let file_version_license_ue4 = read_u32(rdr);
-    let custom_version = read_bytes(rdr, 12);
-    let total_header_size = read_u32(rdr);
-    let folder_name = read_string(rdr);
-    let package_flags = read_u32(rdr);
-    let name_count = read_u32(rdr);
-    let name_offset = read_u32(rdr);
-    let gatherable_text_data_count = read_u32(rdr);
-    let gatherable_text_data_offset = read_u32(rdr);
-    let export_count = read_u32(rdr);
-    let export_offset = read_u32(rdr);
-    let import_count = read_u32(rdr);
-    let import_offset = read_u32(rdr);
-    let depends_offset = read_u32(rdr);
-    let soft_package_references_count = read_u32(rdr);
-    let soft_package_references_offset = read_u32(rdr);
-    let searchable_names_offset = read_u32(rdr);
-    let thumbnail_table_offset = read_u32(rdr);
-    let guid = read_bytes(rdr, 16);
-    let generations = Generation::read_array(rdr);
-    let saved_by_engine_version = read_bytes(rdr, 16);
-    let compatible_with_engine_version = read_bytes(rdr, 16);
-    let compression_flags = read_u32(rdr);
-    let package_source = rdr.read_i64::<LittleEndian>().unwrap();
-    let asset_registry_data_offset = read_u32(rdr);
-    let bulk_data_start_offset = read_u32(rdr);
-    let world_tile_info_data_offset = read_u32(rdr);
-    let chunk_ids = rdr.read_u64::<LittleEndian>().unwrap();
-    let preload_dependency_count = read_u32(rdr);
-    let preload_dependency_offset = read_u32(rdr);
+  pub fn read(rdr: &mut Cursor<Vec<u8>>) -> Result<Self> {
+    let tag: [u8; 4] = read_bytes(rdr, 4)?;
+    let file_version_ue4 = read_u32(rdr)?;
+    let file_version_license_ue4 = read_u32(rdr)?;
+    let custom_version: [u8; 12] = read_bytes(rdr, 12)?;
+    let total_header_size = read_u32(rdr)?;
+    let folder_name = read_string(rdr)?;
+    let package_flags = read_u32(rdr)?;
+    let name_count = read_u32(rdr)?;
+    let name_offset = read_u32(rdr)?;
+    let gatherable_text_data_count = read_u32(rdr)?;
+    let gatherable_text_data_offset = read_u32(rdr)?;
+    let export_count = read_u32(rdr)?;
+    let export_offset = read_u32(rdr)?;
+    let import_count = read_u32(rdr)?;
+    let import_offset = read_u32(rdr)?;
+    let depends_offset = read_u32(rdr)?;
+    let soft_package_references_count = read_u32(rdr)?;
+    let soft_package_references_offset = read_u32(rdr)?;
+    let searchable_names_offset = read_u32(rdr)?;
+    let thumbnail_table_offset = read_u32(rdr)?;
+    let guid: [u8; 16] = read_bytes(rdr, 16)?;
+    let generations = Generation::read_array(rdr)?;
+    let saved_by_engine_version: [u8; 16] = read_bytes(rdr, 16)?;
+    let compatible_with_engine_version: [u8; 16] = read_bytes(rdr, 16)?;
+    let compression_flags = read_u32(rdr)?;
+    let package_source = rdr.read_i64::<LittleEndian>()?;
+    let asset_registry_data_offset = read_u32(rdr)?;
+    let bulk_data_start_offset = read_u32(rdr)?;
+    let world_tile_info_data_offset = read_u32(rdr)?;
+    let chunk_ids = rdr.read_u64::<LittleEndian>()?;
+    let preload_dependency_count = read_u32(rdr)?;
+    let preload_dependency_offset = read_u32(rdr)?;
 
-    return FileSummary {
-      tag: tag[0..4].try_into().unwrap(),
+    Ok(FileSummary {
+      tag,
       file_version_ue4,
       file_version_license_ue4,
-      custom_version: custom_version[0..12].try_into().unwrap(),
+      custom_version,
       total_header_size,
       package_flags,
       folder_name,
@@ -148,10 +148,10 @@ impl FileSummary {
       soft_package_references_offset,
       searchable_names_offset,
       thumbnail_table_offset,
-      guid: guid[0..16].try_into().unwrap(),
+      guid,
       generations,
-      saved_by_engine_version: saved_by_engine_version[0..16].try_into().unwrap(),
-      compatible_with_engine_version: compatible_with_engine_version[0..16].try_into().unwrap(),
+      saved_by_engine_version,
+      compatible_with_engine_version,
       compression_flags,
       package_source,
       asset_registry_data_offset,
@@ -160,7 +160,7 @@ impl FileSummary {
       chunk_ids,
       preload_dependency_count,
       preload_dependency_offset,
-    };
+    })
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> () {

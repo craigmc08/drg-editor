@@ -1,7 +1,7 @@
 use crate::asset::*;
 use crate::util::*;
+use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::convert::TryInto;
 use std::io::prelude::*;
 use std::io::Cursor;
 
@@ -43,29 +43,30 @@ impl ObjectExport {
     names: &NameMap,
     _imports: &ObjectImports,
     _exports: &Vec<ObjectExport>,
-  ) -> Result<Self, String> {
-    let class = read_u32(rdr);
-    let super_index = rdr.read_i32::<LittleEndian>().unwrap();
-    let template = read_u32(rdr);
-    let outer = rdr.read_i32::<LittleEndian>().unwrap();
-    let (object_name, object_name_variant) =
-      names.read_name_with_variant(rdr, "ObjectExports.object_name")?;
-    let object_flags = rdr.read_u32::<LittleEndian>().unwrap();
-    let serial_size = rdr.read_u64::<LittleEndian>().unwrap();
-    let serial_offset = read_u32(rdr);
-    let forced_export = read_bool(rdr);
-    let not_for_client = read_bool(rdr);
-    let not_for_server = read_bool(rdr);
-    let was_filtered = read_bool(rdr);
-    let package_guid = read_bytes(rdr, 16);
-    let package_flags = read_u32(rdr);
-    let not_always_loaded_for_editor_game = read_bool(rdr);
-    let is_asset = read_bool(rdr);
-    let first_export_dependency = read_u32(rdr);
-    let serialization_before_serialization_dependencies = read_u32(rdr);
-    let create_before_serialization_dependencies = read_u32(rdr);
-    let serialization_before_create_dependencies = read_u32(rdr);
-    let create_before_create_dependencies = read_u32(rdr);
+  ) -> Result<Self> {
+    let class = read_u32(rdr)?;
+    let super_index = rdr.read_i32::<LittleEndian>()?;
+    let template = read_u32(rdr)?;
+    let outer = rdr.read_i32::<LittleEndian>()?;
+    let (object_name, object_name_variant) = names
+      .read_name_with_variant(rdr)
+      .with_context(|| format!("object_name"))?;
+    let object_flags = rdr.read_u32::<LittleEndian>()?;
+    let serial_size = rdr.read_u64::<LittleEndian>()?;
+    let serial_offset = read_u32(rdr)?;
+    let forced_export = read_bool(rdr)?;
+    let not_for_client = read_bool(rdr)?;
+    let not_for_server = read_bool(rdr)?;
+    let was_filtered = read_bool(rdr)?;
+    let package_guid: [u8; 16] = read_bytes(rdr, 16)?;
+    let package_flags = read_u32(rdr)?;
+    let not_always_loaded_for_editor_game = read_bool(rdr)?;
+    let is_asset = read_bool(rdr)?;
+    let first_export_dependency = read_u32(rdr)?;
+    let serialization_before_serialization_dependencies = read_u32(rdr)?;
+    let create_before_serialization_dependencies = read_u32(rdr)?;
+    let serialization_before_create_dependencies = read_u32(rdr)?;
+    let create_before_create_dependencies = read_u32(rdr)?;
     return Ok(ObjectExport {
       class,
       super_index,
@@ -81,7 +82,7 @@ impl ObjectExport {
       not_for_client,
       not_for_server,
       was_filtered,
-      package_guid: package_guid[0..16].try_into().unwrap(),
+      package_guid,
       package_flags,
       not_always_loaded_for_editor_game,
       is_asset,
@@ -129,22 +130,21 @@ impl ObjectExports {
     summary: &FileSummary,
     names: &NameMap,
     imports: &ObjectImports,
-  ) -> Result<Self, String> {
+  ) -> Result<Self> {
     if rdr.position() != summary.export_offset.into() {
-      return Err(
-        format!(
-          "Error parsing ObjectExports: Expected to be at position {:04X}, but I'm at position {:04X}",
-          summary.export_offset,
-          rdr.position()
-        )
-        .to_string(),
+      bail!(
+        "Wrong exports starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
+        summary.export_offset,
+        rdr.position(),
       );
     }
 
     let mut exports = vec![];
     let mut export_file_offset = 0;
     for _ in 0..summary.export_count {
-      let mut object = ObjectExport::read(rdr, names, imports, &exports)?;
+      let start_pos = rdr.position();
+      let mut object = ObjectExport::read(rdr, names, imports, &exports)
+        .with_context(|| format!("Failed to parse export starting at {:#X}", start_pos))?;
 
       // Compute export_file_offset based on the size of preceeding exports
       object.export_file_offset = export_file_offset;
@@ -172,16 +172,15 @@ impl ObjectExports {
     return None;
   }
 
-  pub fn lookup(&self, index: u64, rep: &str) -> Result<&ObjectExport, String> {
+  pub fn lookup(&self, index: u64) -> Result<&ObjectExport> {
     if index > self.exports.len() as u64 {
-      return Err(format!(
-        "Export {} for {} is not in ObjectExport (length {})",
+      bail!(
+        "Export index {} is not in exports (length {})",
         index,
-        rep,
         self.exports.len()
-      ));
+      );
     }
-    return Ok(&self.exports[index as usize]);
+    Ok(&self.exports[index as usize])
   }
 
   pub fn byte_size(&self) -> usize {
