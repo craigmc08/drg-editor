@@ -424,6 +424,25 @@ impl FromProperty for f64 {
   }
 }
 
+impl IsSimpleProperty for String {
+  fn tag() -> PropertyTag {
+    PropertyTag::StrProperty
+  }
+  fn to_simple_property(&self) -> PropertyValue {
+    PropertyValue::StrProperty {
+      value: self.to_string(),
+    }
+  }
+}
+impl FromProperty for String {
+  fn from_property(property: &Property) -> Option<Self> {
+    match &property.value {
+      PropertyValue::StrProperty { value } => Some(value.clone()),
+      _ => None,
+    }
+  }
+}
+
 /// Attempts to convert a vector of AsProperty's into an ArrayType.
 ///
 /// # Panics

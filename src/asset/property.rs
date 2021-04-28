@@ -20,7 +20,7 @@ pub enum PropertyTag {
   FloatProperty,
   DoubleProperty,
   TextProperty,
-  // StrProperty, TODO
+  StrProperty,
   NameProperty,
 
   EnumProperty,
@@ -55,6 +55,7 @@ impl PropertyTag {
       "FloatProperty" => Ok(Self::FloatProperty),
       "DoubleProperty" => Ok(Self::DoubleProperty),
       "TextProperty" => Ok(Self::TextProperty),
+      "StrProperty" => Ok(Self::StrProperty),
       "NameProperty" => Ok(Self::NameProperty),
       "EnumProperty" => Ok(Self::EnumProperty),
       "ArrayProperty" => Ok(Self::ArrayProperty),
@@ -80,6 +81,7 @@ impl PropertyTag {
       Self::FloatProperty => "FloatProperty",
       Self::DoubleProperty => "DoubleProperty",
       Self::TextProperty => "TextProperty",
+      Self::StrProperty => "StrProperty",
       Self::NameProperty => "NameProperty",
       Self::EnumProperty => "EnumProperty",
       Self::ArrayProperty => "ArrayProperty",
@@ -240,7 +242,7 @@ impl NestedValue {
           value: Dependency::uobject(),
         },
       },
-      _ => unimplemented!(),
+      _ => unreachable!(),
     }
   }
 
@@ -328,6 +330,9 @@ pub enum PropertyValue {
   },
   TextProperty {
     bytes: [u8; 13], // TODO this might be wrong
+    value: String,
+  },
+  StrProperty {
     value: String,
   },
   NameProperty {
@@ -423,6 +428,12 @@ impl PropertyValue {
         Ok(Self::TextProperty { bytes, value })
       }
       PropertyTagData::EmptyTag {
+        tag: PropertyTag::StrProperty,
+      } => {
+        let value = read_string(rdr)?;
+        Ok(Self::StrProperty { value })
+      }
+      PropertyTagData::EmptyTag {
         tag: PropertyTag::NameProperty,
       } => {
         let name = NameVariant::read(rdr, names).with_context(|| "NameProperty.name")?;
@@ -504,6 +515,9 @@ impl PropertyValue {
         curs.write(bytes)?;
         write_string(curs, value)?;
       }
+      Self::StrProperty { value } => {
+        write_string(curs, value)?;
+      }
       Self::NameProperty { name } => {
         name
           .write(curs, names)
@@ -563,6 +577,10 @@ impl PropertyValue {
         // bytes + length + string value + null terminator
         bytes.len() + 4 + value.len() + 1
       }
+      Self::StrProperty { value } => {
+        // u32 length + string length + null terminator
+        4 + value.len() + 1
+      }
       Self::NameProperty { .. } => 8,
       Self::ArrayProperty { values, .. } => {
         // u32 size + values
@@ -596,6 +614,7 @@ impl PropertyValue {
       Self::FloatProperty { .. } => PropertyTag::FloatProperty,
       Self::DoubleProperty { .. } => PropertyTag::DoubleProperty,
       Self::TextProperty { .. } => PropertyTag::TextProperty,
+      Self::StrProperty { .. } => PropertyTag::StrProperty,
       Self::NameProperty { .. } => PropertyTag::NameProperty,
       Self::EnumProperty { .. } => PropertyTag::EnumProperty,
       Self::ArrayProperty { .. } => PropertyTag::ArrayProperty,
