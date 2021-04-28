@@ -53,7 +53,12 @@ impl Editor {
 }
 
 /// Returns some value if the Dependency is changed
-pub fn input_dependency(ui: &Ui, label: &str, dep: Dependency) -> Option<Dependency> {
+pub fn input_dependency(
+  ui: &Ui,
+  label: &str,
+  asset: &Asset,
+  dep: Dependency,
+) -> Option<Dependency> {
   let mut new_dep = dep.clone();
 
   let (prev_item, prev_name) = match dep {
@@ -80,21 +85,36 @@ pub fn input_dependency(ui: &Ui, label: &str, dep: Dependency) -> Option<Depende
     }
   }
 
-  new_dep = match new_dep {
-    Dependency::UObject => Dependency::uobject(),
-    Dependency::Import(name) => {
-      let mut new_name = ImString::new(name.to_string());
-      new_name.reserve(64);
-      ui.input_text(&ImString::new(label), &mut new_name).build();
-      changed = changed || new_name != ImString::from(name.to_string());
-      Dependency::import(new_name.as_ref())
-    }
-    Dependency::Export(name) => {
-      let mut new_name = ImString::new(name.to_string());
-      ui.input_text(&ImString::new(label), &mut new_name).build();
-      changed = changed || new_name != ImString::from(name.to_string());
-      Dependency::export(new_name.as_ref())
-    }
+  match new_dep.clone() {
+    Dependency::UObject => {}
+    Dependency::Import(name) => ComboBox::new(im_str!("Import"))
+      .preview_value(&ImString::from(name.to_string()))
+      .build(&ui, || {
+        for import in asset.list_imports() {
+          let is_selected = name == import.name;
+          if Selectable::new(&ImString::from(import.name.to_string()))
+            .selected(is_selected)
+            .build(&ui)
+          {
+            new_dep = Dependency::Import(import.name.clone());
+            changed = changed || !is_selected;
+          }
+        }
+      }),
+    Dependency::Export(name) => ComboBox::new(im_str!("Export"))
+      .preview_value(&ImString::from(name.to_string()))
+      .build(&ui, || {
+        for export in asset.list_exports() {
+          let is_selected = name == export;
+          if Selectable::new(&ImString::from(export.to_string()))
+            .selected(is_selected)
+            .build(&ui)
+          {
+            new_dep = Dependency::Export(export);
+            changed = changed || !is_selected;
+          }
+        }
+      }),
   };
 
   if changed {

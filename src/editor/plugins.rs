@@ -102,14 +102,14 @@ impl EditorPlugin {
   }
 
   /// Returns true if a change was made
-  pub fn input(&mut self, ui: &Ui, assets: &Asset) -> bool {
+  pub fn input(&mut self, ui: &Ui, asset: &Asset) -> bool {
     match &mut self.plugin {
       PluginType::PluginNone { reason } => {
         ui.text(format!("Can't edit {}: {}", self.original.name, reason));
         false
       }
       PluginType::PluginObject { dep } => {
-        if let Some(new_dep) = input_dependency(ui, "ObjectProperty", dep.clone()) {
+        if let Some(new_dep) = input_dependency(ui, "ObjectProperty", asset, dep.clone()) {
           *dep = new_dep;
           true
         } else {
@@ -134,7 +134,7 @@ impl EditorPlugin {
             to_remove.push(i);
           }
 
-          changed = changed || editor.input(ui, assets);
+          changed = changed || editor.input(ui, asset);
 
           id.pop(ui);
         }

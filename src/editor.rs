@@ -188,9 +188,19 @@ fn draw_imports_editor(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edit
           .find(|im| selected == &im.name)
           .expect("Invalid Import select state");
 
+        // TODO: this name deserialization should probably happen after reading
+        // imports during Asset::read. But that will require a bunch of work
+        let outer = Dependency::deserialize(
+          import.outer_index,
+          &editor.asset.imports,
+          &editor.asset.exports,
+        )
+        .expect("Invalid Import outer");
+
         ui.text(format!("Class Package: {}", import.class_package));
         ui.text(format!("Class: {}", import.class_package));
         ui.text(format!("Name: {}", import.name));
+        ui.text(format!("Outer: {}", outer));
       } else {
         ui.text("Select an import");
       }
@@ -204,7 +214,7 @@ fn draw_imports_editor(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edit
             .as_mut()
             .expect("Add Import modal not initialized properly");
 
-          input_import(ui, new_import);
+          input_import(ui, &editor.asset, new_import);
 
           if ui.button(im_str!("Add"), [0.0, 0.0]) {
             editor.asset.import(
@@ -314,12 +324,12 @@ fn draw_property_editor(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edi
   });
 }
 
-fn input_import(ui: &Ui, import: &mut EditableImport) {
+fn input_import(ui: &Ui, asset: &Asset, import: &mut EditableImport) {
   ui.input_text(im_str!("Class Package"), &mut import.class_package)
     .build();
   ui.input_text(im_str!("Class"), &mut import.class).build();
   ui.input_text(im_str!("Name"), &mut import.name).build();
-  if let Some(new_dep) = input_dependency(ui, "Outer", import.outer.clone()) {
+  if let Some(new_dep) = input_dependency(ui, "Outer", asset, import.outer.clone()) {
     import.outer = new_dep;
   }
 }

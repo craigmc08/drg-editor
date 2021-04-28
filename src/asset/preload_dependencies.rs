@@ -75,6 +75,16 @@ impl Dependency {
   }
 }
 
+impl std::fmt::Display for Dependency {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      Self::UObject => write!(f, "UObject"),
+      Self::Import(name) => write!(f, "Import {}", name),
+      Self::Export(name) => write!(f, "Export {}", name),
+    }
+  }
+}
+
 #[derive(Debug)]
 pub struct PreloadDependencies {
   // each n in the dependencies array is:
