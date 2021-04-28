@@ -263,11 +263,11 @@ fn draw_property_selector(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut E
         .exports
         .iter()
         .position(|x| &x.object_name == selected)
-        .expect("Invalid selected export");
+        .expect("Invalid selected export (this is a bug in the program)");
       let strct = &editor.asset.structs[idx];
       for prop in &strct.properties {
         let active = Some(&prop.name) == editor.selected_property.as_ref().map(|s| &s.name);
-        if ui.radio_button_bool(&ImString::from(prop.name.clone()), active) {
+        if ui.radio_button_bool(&ImString::from(prop.name.clone()), active) && !active {
           editor.selected_property = Some(SelectedProperty {
             name: prop.name.clone(),
             dirty: false,

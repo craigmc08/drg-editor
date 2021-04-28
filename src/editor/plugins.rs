@@ -15,6 +15,12 @@ pub enum PluginType {
     value_tag: PropertyTag,
     sub_editors: Vec<EditorPlugin>,
   },
+  PluginBool {
+    value: bool,
+  },
+  PluginFloat {
+    value: f32,
+  },
 }
 
 impl PluginType {
@@ -23,6 +29,8 @@ impl PluginType {
       Self::PluginNone { .. } => original.clone(),
       Self::PluginObject { dep } => dep.as_property(&original.name),
       Self::PluginArray { sub_editors, .. } => vec_as_property_unsafe(sub_editors, &original.name),
+      Self::PluginBool { value } => value.as_property(&original.name),
+      Self::PluginFloat { value } => value.as_property(&original.name),
     }
   }
 }
@@ -33,23 +41,6 @@ pub struct EditorPlugin {
 }
 
 impl EditorPlugin {
-  fn new_from_nv(nv: &NestedValue) -> Option<Self> {
-    match nv {
-      NestedValue::Simple { value } => Some(Self::new(&Property {
-        // Every field except value doesn't matter
-        name: "".to_string(),
-        name_variant: 0,
-        tag: PropertyTag::ByteProperty,
-        size: 0,
-        tag_data: PropertyTagData::EmptyTag {
-          tag: PropertyTag::ByteProperty,
-        },
-        value: value.clone(),
-      })),
-      NestedValue::Complex { value: Some(value) } => Some(Self::new(value)),
-      NestedValue::Complex { .. } => None,
-    }
-  }
   pub fn new(property: &Property) -> Self {
     let plugin = match &property.value {
       PropertyValue::ObjectProperty { value } => PluginType::PluginObject { dep: value.clone() },
@@ -76,6 +67,14 @@ impl EditorPlugin {
           unreachable!()
         }
       }
+      PropertyValue::BoolProperty {} => {
+        if let PropertyTagData::BoolTag { value } = property.tag_data {
+          PluginType::PluginBool { value }
+        } else {
+          unreachable!()
+        }
+      }
+      PropertyValue::FloatProperty { value } => PluginType::PluginFloat { value: *value },
       _ => PluginType::PluginNone {
         reason: format!("Unsupported property type {:?}", property.tag),
       },
@@ -83,16 +82,6 @@ impl EditorPlugin {
     EditorPlugin {
       original: property.clone(),
       plugin,
-    }
-  }
-
-  pub fn save(&self, strct: &mut Struct) {
-    if let Some(i) = strct
-      .properties
-      .iter()
-      .position(|prop| prop.name == self.original.name)
-    {
-      strct.properties[i] = self.plugin.to_property(&self.original);
     }
   }
 
@@ -149,6 +138,43 @@ impl EditorPlugin {
 
         changed
       }
+      PluginType::PluginBool { value } => {
+        let label = if *value { "Yes" } else { "No" };
+        ui.checkbox(&ImString::from(label.to_string()), value)
+      }
+      PluginType::PluginFloat { value } => {
+        let prev = *value;
+        ui.input_float(im_str!("Float"), value).build();
+        prev != *value
+      }
+    }
+  }
+
+  fn new_from_nv(nv: &NestedValue) -> Option<Self> {
+    match nv {
+      NestedValue::Simple { value } => Some(Self::new(&Property {
+        // Every field except value doesn't matter
+        name: "".to_string(),
+        name_variant: 0,
+        tag: PropertyTag::ByteProperty,
+        size: 0,
+        tag_data: PropertyTagData::EmptyTag {
+          tag: PropertyTag::ByteProperty,
+        },
+        value: value.clone(),
+      })),
+      NestedValue::Complex { value: Some(value) } => Some(Self::new(value)),
+      NestedValue::Complex { .. } => None,
+    }
+  }
+
+  pub fn save(&self, strct: &mut Struct) {
+    if let Some(i) = strct
+      .properties
+      .iter()
+      .position(|prop| prop.name == self.original.name)
+    {
+      strct.properties[i] = self.plugin.to_property(&self.original);
     }
   }
 }
