@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 pub mod asset;
 pub mod bindings;
 pub mod editor;

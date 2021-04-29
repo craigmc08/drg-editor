@@ -198,7 +198,7 @@ fn draw_imports_editor(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edit
         .expect("Invalid Import outer");
 
         ui.text(format!("Class Package: {}", import.class_package));
-        ui.text(format!("Class: {}", import.class_package));
+        ui.text(format!("Class: {}", import.class));
         ui.text(format!("Name: {}", import.name));
         ui.text(format!("Outer: {}", outer));
       } else {
