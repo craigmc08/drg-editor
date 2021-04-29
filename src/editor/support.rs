@@ -1,3 +1,5 @@
+// Based on https://github.com/imgui-rs/imgui-rs/blob/master/imgui-examples/examples/support/mod.rs
+
 use glium::glutin;
 use glium::glutin::event::{Event, WindowEvent};
 use glium::glutin::event_loop::{ControlFlow, EventLoop};
@@ -7,6 +9,8 @@ use imgui::{Context, FontConfig, FontSource, Ui};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
 use std::time::Instant;
+
+mod clipboard;
 
 pub struct System {
   pub event_loop: EventLoop<()>,
@@ -27,6 +31,12 @@ pub fn init(title: &str) -> System {
 
   let mut imgui = Context::create();
   imgui.set_ini_filename(None);
+
+  if let Some(backend) = clipboard::init() {
+    imgui.set_clipboard_backend(Box::new(backend));
+  } else {
+    eprintln!("Failed to initialize clipboard");
+  }
 
   let mut platform = WinitPlatform::init(&mut imgui);
   {
