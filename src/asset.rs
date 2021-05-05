@@ -26,7 +26,7 @@ pub struct Asset {
   pub exports: ObjectExports,
   pub assets: AssetRegistry,
   pub dependencies: PreloadDependencies,
-  pub structs: Vec<Struct>,
+  pub structs: Vec<Properties>,
 }
 
 impl Asset {
@@ -72,9 +72,10 @@ impl Asset {
     let mut cursor_uexp = Cursor::new(uexp);
     // Read all export structs
     let mut structs = vec![];
+    let ctx = PropertyContext::new(&summary, &names, &imports, &exports);
     for export in exports.exports.iter() {
       let start_pos = cursor_uexp.position();
-      let strct = Struct::read(&mut cursor_uexp, export, &names, &imports, &exports)
+      let strct = Properties::deserialize(&mut cursor_uexp, export, ctx)
         .with_context(|| format!("Failed to read struct starting at {:#X}", start_pos))?;
       structs.push(strct);
     }
@@ -118,15 +119,14 @@ impl Asset {
       .with_context(|| "Failed to write preload dependencies")?;
 
     let mut cursor_uexp = Cursor::new(vec![]);
+    let ctx = PropertyContext::new(&self.summary, &self.names, &self.imports, &self.exports);
     for (i, strct) in self.structs.iter().enumerate() {
-      strct
-        .write(&mut cursor_uexp, &self.names, &self.imports, &self.exports)
-        .with_context(|| {
-          format!(
-            "Failed to write struct {}",
-            self.exports.exports[i].object_name
-          )
-        })?;
+      strct.serialize(&mut cursor_uexp, ctx).with_context(|| {
+        format!(
+          "Failed to write struct {}",
+          self.exports.exports[i].object_name
+        )
+      })?;
     }
     cursor_uexp.write(&self.summary.tag)?;
 
@@ -137,6 +137,8 @@ impl Asset {
   }
 
   pub fn recalculate_offsets(&mut self) -> () {
+    let structs_size = self.structs.iter().map(|ps| ps.byte_size()).sum::<usize>();
+
     self.summary.total_header_size = (self.summary.byte_size()
       + self.names.byte_size()
       + self.imports.byte_size()
@@ -165,7 +167,7 @@ impl Asset {
       + self.exports.byte_size()
       + self.assets.byte_size()
       + self.dependencies.byte_size()
-      + Struct::total_size(&self.structs)) as u32;
+      + structs_size) as u32;
     self.summary.preload_dependency_count = self.dependencies.dependencies.len() as u32;
     self.summary.preload_dependency_offset = (self.summary.byte_size()
       + self.names.byte_size()
@@ -182,7 +184,7 @@ impl Asset {
     let mut running_size_total = 0;
     for i in 0..(self.summary.export_count as usize) {
       self.exports.exports[i].export_file_offset = running_size_total as u64;
-      self.exports.exports[i].serial_size = Struct::total_size(&self.structs) as u64;
+      self.exports.exports[i].serial_size = structs_size as u64;
       self.exports.exports[i].serial_offset = running_size_total + self.summary.total_header_size;
       running_size_total += self.exports.exports[i].serial_size as u32;
     }

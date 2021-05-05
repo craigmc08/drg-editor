@@ -3,6 +3,7 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::convert::TryFrom;
 use std::io::prelude::*;
 use std::io::Cursor;
+use std::io::{Seek, SeekFrom};
 
 /// Reads a number of bytes to some type.
 ///
@@ -37,6 +38,19 @@ pub fn read_string(rdr: &mut Cursor<Vec<u8>>) -> Result<String> {
 
 pub fn read_bool(rdr: &mut Cursor<Vec<u8>>) -> Result<bool> {
   Ok(read_u32(rdr)? != 0)
+}
+
+pub fn next_matches(rdr: &mut Cursor<Vec<u8>>, bytes: &[u8]) -> bool {
+  let start_pos = rdr.position();
+  if let Ok(read) = read_bytes::<Vec<u8>>(rdr, bytes.len()) {
+    let eq = bytes.iter().zip(read).all(|(a, b)| *a == b);
+    rdr
+      .seek(SeekFrom::Start(start_pos))
+      .expect("Seek should not fail");
+    eq
+  } else {
+    false
+  }
 }
 
 pub fn write_u32(curs: &mut Cursor<Vec<u8>>, val: u32) -> Result<()> {
