@@ -1,4 +1,5 @@
 use crate::asset::*;
+use crate::reader::*;
 use crate::util::*;
 use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -13,7 +14,7 @@ pub struct Name {
 }
 
 impl Name {
-  fn read(rdr: &mut Cursor<Vec<u8>>) -> Result<Self> {
+  fn read(rdr: &mut ByteReader) -> Result<Self> {
     let name = read_string(rdr)?;
     let non_case_preserving_hash = rdr.read_u16::<LittleEndian>()?;
     let case_preserving_hash = rdr.read_u16::<LittleEndian>()?;
@@ -76,7 +77,7 @@ impl NameVariant {
     }
   }
 
-  pub fn read(rdr: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<Self> {
+  pub fn read(rdr: &mut ByteReader, names: &NameMap) -> Result<Self> {
     let start_pos = rdr.position();
     let index = rdr.read_u32::<LittleEndian>()?;
     let name = names
@@ -113,7 +114,7 @@ pub struct NameMap {
 }
 
 impl NameMap {
-  pub fn read(rdr: &mut Cursor<Vec<u8>>, summary: &FileSummary) -> Result<Self> {
+  pub fn read(rdr: &mut ByteReader, summary: &FileSummary) -> Result<Self> {
     if rdr.position() != summary.name_offset.into() {
       bail!(
         "Wrong name map starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
@@ -185,7 +186,7 @@ impl NameMap {
     return true;
   }
 
-  pub fn read_name(&self, rdr: &mut Cursor<Vec<u8>>) -> Result<String> {
+  pub fn read_name(&self, rdr: &mut ByteReader) -> Result<String> {
     let index = rdr.read_u32::<LittleEndian>()?;
     match self.lookup(index).map(|x| x.name.clone()) {
       Err(err) => bail!("{} at {:04X}", err, rdr.position()),

@@ -1,4 +1,5 @@
 use crate::asset::*;
+use crate::reader::*;
 use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
@@ -17,7 +18,7 @@ pub struct ObjectImports {
 }
 
 impl ObjectImport {
-  fn read(rdr: &mut Cursor<Vec<u8>>, name_map: &NameMap) -> Result<Self> {
+  fn read(rdr: &mut ByteReader, name_map: &NameMap) -> Result<Self> {
     let class_package = NameVariant::read(rdr, name_map).with_context(|| "class_package")?;
     let class = NameVariant::read(rdr, name_map).with_context(|| "class")?;
     let outer_index = rdr.read_i32::<LittleEndian>()?;
@@ -43,11 +44,7 @@ impl ObjectImport {
 }
 
 impl ObjectImports {
-  pub fn read(
-    rdr: &mut Cursor<Vec<u8>>,
-    summary: &FileSummary,
-    name_map: &NameMap,
-  ) -> Result<Self> {
+  pub fn read(rdr: &mut ByteReader, summary: &FileSummary, name_map: &NameMap) -> Result<Self> {
     if rdr.position() != summary.import_offset.into() {
       bail!(
         "Wrong imports starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
@@ -128,7 +125,7 @@ impl ObjectImports {
     return -(len as i32) - 1;
   }
 
-  pub fn read_import(&self, rdr: &mut Cursor<Vec<u8>>) -> Result<NameVariant> {
+  pub fn read_import(&self, rdr: &mut ByteReader) -> Result<NameVariant> {
     let index_raw = rdr.read_u32::<LittleEndian>()?;
     let index = std::u32::MAX - index_raw; // import indices are stored as -index - 1, for some reason
     Ok(self.lookup(index.into()).map(|x| x.name.clone())?)

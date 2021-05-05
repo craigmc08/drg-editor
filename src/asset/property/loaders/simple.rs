@@ -3,6 +3,7 @@ use crate::asset::property::loaders::PropertyLoader;
 use crate::asset::property::prop_type::*;
 use crate::asset::*;
 use crate::loader_simple;
+use crate::reader::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 pub const LOADER_INT: PropertyLoader = loader_simple!(
@@ -38,12 +39,22 @@ pub const LOADER_NAME: PropertyLoader = loader_simple!(
 
 // TODO: figure out if boiler plate on the numeric types can be reduced further?
 
-fn deserialize_int(rdr: Curs, _tag: &Tag, _max_size: u64, _ctx: PropertyContext) -> Result<Value> {
+fn deserialize_int(
+  rdr: &mut ByteReader,
+  _tag: &Tag,
+  _max_size: u64,
+  _ctx: PropertyContext,
+) -> Result<Value> {
   Ok(Value::Int(rdr.read_i32::<LittleEndian>()?))
 }
 /// # Panics
 /// If `val` is not Int variant.
-fn serialize_int(val: &Value, _tag: &Tag, curs: Curs, _ctx: PropertyContext) -> Result<()> {
+fn serialize_int(
+  val: &Value,
+  _tag: &Tag,
+  curs: &mut Cursor<Vec<u8>>,
+  _ctx: PropertyContext,
+) -> Result<()> {
   if let Value::Int(val) = val {
     curs.write_i32::<LittleEndian>(*val)?;
     Ok(())
@@ -53,7 +64,7 @@ fn serialize_int(val: &Value, _tag: &Tag, curs: Curs, _ctx: PropertyContext) -> 
 }
 
 fn deserialize_float(
-  rdr: Curs,
+  rdr: &mut ByteReader,
   _tag: &Tag,
   _max_size: u64,
   _ctx: PropertyContext,
@@ -62,7 +73,12 @@ fn deserialize_float(
 }
 /// # Panics
 /// If `val` is not Float variant.
-fn serialize_float(val: &Value, _tag: &Tag, curs: Curs, _ctx: PropertyContext) -> Result<()> {
+fn serialize_float(
+  val: &Value,
+  _tag: &Tag,
+  curs: &mut Cursor<Vec<u8>>,
+  _ctx: PropertyContext,
+) -> Result<()> {
   if let Value::Float(val) = val {
     curs.write_f32::<LittleEndian>(*val)?;
     Ok(())
@@ -72,7 +88,7 @@ fn serialize_float(val: &Value, _tag: &Tag, curs: Curs, _ctx: PropertyContext) -
 }
 
 fn deserialize_object(
-  rdr: Curs,
+  rdr: &mut ByteReader,
   _tag: &Tag,
   _max_size: u64,
   ctx: PropertyContext,
@@ -85,7 +101,12 @@ fn deserialize_object(
 }
 /// # Panics
 /// If `val` is not Object variant.
-fn serialize_object(val: &Value, _tag: &Tag, curs: Curs, ctx: PropertyContext) -> Result<()> {
+fn serialize_object(
+  val: &Value,
+  _tag: &Tag,
+  curs: &mut Cursor<Vec<u8>>,
+  ctx: PropertyContext,
+) -> Result<()> {
   if let Value::Object(dep) = val {
     dep.write(curs, ctx.imports, ctx.exports)?;
     Ok(())
@@ -95,7 +116,7 @@ fn serialize_object(val: &Value, _tag: &Tag, curs: Curs, ctx: PropertyContext) -
 }
 
 fn deserialize_softobject(
-  rdr: Curs,
+  rdr: &mut ByteReader,
   _tag: &Tag,
   _max_size: u64,
   ctx: PropertyContext,
@@ -107,7 +128,12 @@ fn deserialize_softobject(
 }
 /// # Panics
 /// If `val` is not SoftObject variant
-fn serialize_softobject(val: &Value, _tag: &Tag, curs: Curs, ctx: PropertyContext) -> Result<()> {
+fn serialize_softobject(
+  val: &Value,
+  _tag: &Tag,
+  curs: &mut Cursor<Vec<u8>>,
+  ctx: PropertyContext,
+) -> Result<()> {
   if let Value::SoftObject { object_name, unk1 } = val {
     object_name
       .write(curs, ctx.names)
@@ -119,14 +145,19 @@ fn serialize_softobject(val: &Value, _tag: &Tag, curs: Curs, ctx: PropertyContex
   }
 }
 
-fn deserialize_name(rdr: Curs, _: &Tag, _: u64, ctx: PropertyContext) -> Result<Value> {
+fn deserialize_name(rdr: &mut ByteReader, _: &Tag, _: u64, ctx: PropertyContext) -> Result<Value> {
   Ok(Value::Name(
     NameVariant::read(rdr, ctx.names).with_context(|| "Name")?,
   ))
 }
 /// # Panics
 /// If val is not Name variant
-fn serialize_name(val: &Value, _: &Tag, curs: Curs, ctx: PropertyContext) -> Result<()> {
+fn serialize_name(
+  val: &Value,
+  _: &Tag,
+  curs: &mut Cursor<Vec<u8>>,
+  ctx: PropertyContext,
+) -> Result<()> {
   if let Value::Name(val) = val {
     val.write(curs, ctx.names).with_context(|| "Names")?;
     Ok(())

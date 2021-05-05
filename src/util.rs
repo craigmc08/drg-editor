@@ -1,8 +1,7 @@
 use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::convert::TryFrom;
-use std::io::prelude::*;
-use std::io::Cursor;
+use std::io::{Read, Write};
 use std::io::{Seek, SeekFrom};
 
 /// Reads a number of bytes to some type.
@@ -15,7 +14,7 @@ use std::io::{Seek, SeekFrom};
 ///
 /// Note that the length of the slice and the nubmer of bytes read should be
 /// the same, otherwise the function call can fail.
-pub fn read_bytes<T: TryFrom<Vec<u8>>>(rdr: &mut Cursor<Vec<u8>>, len: usize) -> Result<T> {
+pub fn read_bytes<R: Read, T: TryFrom<Vec<u8>>>(rdr: &mut R, len: usize) -> Result<T> {
   let mut buf = vec![0; len];
   rdr.read_exact(&mut buf)?;
   match T::try_from(buf) {
@@ -24,25 +23,26 @@ pub fn read_bytes<T: TryFrom<Vec<u8>>>(rdr: &mut Cursor<Vec<u8>>, len: usize) ->
   }
 }
 
-pub fn read_u32(rdr: &mut Cursor<Vec<u8>>) -> Result<u32> {
+pub fn read_u32<R: Read>(rdr: &mut R) -> Result<u32> {
   Ok(rdr.read_u32::<LittleEndian>()?)
 }
 
 /// Reads a length-prefixed, null-terminated string
-pub fn read_string(rdr: &mut Cursor<Vec<u8>>) -> Result<String> {
+pub fn read_string<R: Read>(rdr: &mut R) -> Result<String> {
   let length = read_u32(rdr)? as usize;
   let chars = read_bytes(rdr, length - 1)?;
-  rdr.consume(1); // Skip the 0 terminator
+  rdr.read_exact(&mut [0])?;
   Ok(String::from_utf8(chars)?)
 }
 
-pub fn read_bool(rdr: &mut Cursor<Vec<u8>>) -> Result<bool> {
+pub fn read_bool<R: Read>(rdr: &mut R) -> Result<bool> {
   Ok(read_u32(rdr)? != 0)
 }
 
-pub fn next_matches(rdr: &mut Cursor<Vec<u8>>, bytes: &[u8]) -> bool {
-  let start_pos = rdr.position();
-  if let Ok(read) = read_bytes::<Vec<u8>>(rdr, bytes.len()) {
+pub fn next_matches<R: Read + Seek>(rdr: &mut R, bytes: &[u8]) -> bool {
+  // This unwrap should never fail
+  let start_pos = rdr.seek(SeekFrom::Current(0)).unwrap();
+  if let Ok(read) = read_bytes::<R, Vec<u8>>(rdr, bytes.len()) {
     let eq = bytes.iter().zip(read).all(|(a, b)| *a == b);
     rdr
       .seek(SeekFrom::Start(start_pos))
@@ -53,12 +53,12 @@ pub fn next_matches(rdr: &mut Cursor<Vec<u8>>, bytes: &[u8]) -> bool {
   }
 }
 
-pub fn write_u32(curs: &mut Cursor<Vec<u8>>, val: u32) -> Result<()> {
+pub fn write_u32<W: Write>(curs: &mut W, val: u32) -> Result<()> {
   curs.write_u32::<LittleEndian>(val)?;
   Ok(())
 }
 
-pub fn write_string(curs: &mut Cursor<Vec<u8>>, string: &str) -> Result<()> {
+pub fn write_string<W: Write>(curs: &mut W, string: &str) -> Result<()> {
   let length = string.len() + 1;
   write_u32(curs, length as u32)?;
   curs.write(string.as_bytes())?;
@@ -66,7 +66,7 @@ pub fn write_string(curs: &mut Cursor<Vec<u8>>, string: &str) -> Result<()> {
   Ok(())
 }
 
-pub fn write_bool(curs: &mut Cursor<Vec<u8>>, val: bool) -> Result<()> {
+pub fn write_bool<W: Write>(curs: &mut W, val: bool) -> Result<()> {
   write_u32(curs, if val { 1 } else { 0 })?;
   Ok(())
 }

@@ -11,7 +11,9 @@ use strct::*;
 use crate::asset::property::context::*;
 use crate::asset::property::prop_type::*;
 use crate::asset::property::{Tag, Value};
+use crate::reader::*;
 use anyhow::*;
+use std::io::Cursor;
 
 pub const LOADERS: &[PropertyLoader] = &[
   LOADER_INT,
@@ -25,10 +27,10 @@ pub const LOADERS: &[PropertyLoader] = &[
   LOADER_STRUCT,
 ];
 
-type TagDeserializer = dyn Fn(Curs, PropertyContext) -> Result<Tag>;
-type ValueDeserializer = dyn Fn(Curs, &Tag, u64, PropertyContext) -> Result<Value>;
-type TagSerializer = dyn Fn(&Tag, Curs, PropertyContext) -> Result<()>;
-type ValueSerializer = dyn Fn(&Value, &Tag, Curs, PropertyContext) -> Result<()>;
+type TagDeserializer = dyn Fn(&mut ByteReader, PropertyContext) -> Result<Tag>;
+type ValueDeserializer = dyn Fn(&mut ByteReader, &Tag, u64, PropertyContext) -> Result<Value>;
+type TagSerializer = dyn Fn(&Tag, &mut Cursor<Vec<u8>>, PropertyContext) -> Result<()>;
+type ValueSerializer = dyn Fn(&Value, &Tag, &mut Cursor<Vec<u8>>, PropertyContext) -> Result<()>;
 type ValueSizer = dyn Fn(&Value, &Tag) -> usize;
 type TagSizer = dyn Fn(&Tag) -> usize;
 
@@ -83,7 +85,7 @@ impl<'a> PropertyLoader<'a> {
 
   pub fn deserialize_value(
     &self,
-    rdr: Curs,
+    rdr: &mut ByteReader,
     tag: &Tag,
     max_size: u64,
     ctx: PropertyContext,
@@ -91,13 +93,13 @@ impl<'a> PropertyLoader<'a> {
     (self.deserialize_value)(rdr, tag, max_size, ctx)
   }
 
-  pub fn deserialize_tag(&self, rdr: Curs, ctx: PropertyContext) -> Result<Tag> {
+  pub fn deserialize_tag(&self, rdr: &mut ByteReader, ctx: PropertyContext) -> Result<Tag> {
     (self.deserialize_tag)(rdr, ctx)
   }
 
   pub fn serialize_value(
     &self,
-    curs: Curs,
+    curs: &mut Cursor<Vec<u8>>,
     value: &Value,
     tag: &Tag,
     ctx: PropertyContext,
@@ -105,7 +107,12 @@ impl<'a> PropertyLoader<'a> {
     (self.serialize_value)(value, tag, curs, ctx)
   }
 
-  pub fn serialize_tag(&self, curs: Curs, tag: &Tag, ctx: PropertyContext) -> Result<()> {
+  pub fn serialize_tag(
+    &self,
+    curs: &mut Cursor<Vec<u8>>,
+    tag: &Tag,
+    ctx: PropertyContext,
+  ) -> Result<()> {
     (self.serialize_tag)(tag, curs, ctx)
   }
 

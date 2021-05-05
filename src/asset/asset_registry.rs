@@ -1,4 +1,5 @@
 use crate::asset::*;
+use crate::reader::*;
 use crate::util::*;
 use anyhow::*;
 use std::io::prelude::*;
@@ -12,7 +13,7 @@ pub struct AssetRegistry {
 }
 
 impl AssetRegistry {
-  pub fn read(rdr: &mut Cursor<Vec<u8>>, summary: &FileSummary) -> Result<Self> {
+  pub fn read(rdr: &mut ByteReader, summary: &FileSummary) -> Result<Self> {
     // Asset registry actually contains both Depends and AssetsRegistry
     if rdr.position() != summary.depends_offset.into() {
       bail!(

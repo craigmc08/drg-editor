@@ -3,6 +3,7 @@
 mod asset;
 // mod bindings;
 // mod editor;
+mod reader;
 mod util;
 
 use asset::*;

@@ -3,6 +3,7 @@ use crate::asset::property::loaders::PropertyLoader;
 use crate::asset::property::prop_type::*;
 use crate::asset::*;
 use crate::loader;
+use crate::reader::*;
 use crate::util::*;
 use std::io::prelude::*;
 use std::io::{Seek, SeekFrom};
@@ -17,7 +18,7 @@ pub const LOADER_STRUCT: PropertyLoader = loader!(
   |_| 24,
 );
 
-fn deserialize_struct_tag(rdr: Curs, ctx: PropertyContext) -> Result<Tag> {
+fn deserialize_struct_tag(rdr: &mut ByteReader, ctx: PropertyContext) -> Result<Tag> {
   let type_name = NameVariant::read(rdr, ctx.names).with_context(|| "Struct.type_name")?;
   let guid = read_bytes(rdr, 16)?;
   Ok(Tag::Struct { type_name, guid })
@@ -25,7 +26,7 @@ fn deserialize_struct_tag(rdr: Curs, ctx: PropertyContext) -> Result<Tag> {
 
 /// # Panics
 /// If `tag` is not Struct variant.
-fn serialize_struct_tag(tag: &Tag, curs: Curs, ctx: PropertyContext) -> Result<()> {
+fn serialize_struct_tag(tag: &Tag, curs: &mut Cursor<Vec<u8>>, ctx: PropertyContext) -> Result<()> {
   if let Tag::Struct { type_name, guid } = tag {
     type_name
       .write(curs, ctx.names)
@@ -39,7 +40,12 @@ fn serialize_struct_tag(tag: &Tag, curs: Curs, ctx: PropertyContext) -> Result<(
 
 /// # Panics
 /// If `tag` is not Struct variant
-fn deserialize_struct(rdr: Curs, _tag: &Tag, max_size: u64, ctx: PropertyContext) -> Result<Value> {
+fn deserialize_struct(
+  rdr: &mut ByteReader,
+  _tag: &Tag,
+  max_size: u64,
+  ctx: PropertyContext,
+) -> Result<Value> {
   let start_pos = rdr.position();
   let end_pos = rdr.position() + max_size;
 
@@ -89,7 +95,12 @@ fn deserialize_struct(rdr: Curs, _tag: &Tag, max_size: u64, ctx: PropertyContext
 
 /// # Panics
 /// Panics if `val` is not Struct or RawData variant.
-fn serialize_struct(val: &Value, _tag: &Tag, curs: Curs, ctx: PropertyContext) -> Result<()> {
+fn serialize_struct(
+  val: &Value,
+  _tag: &Tag,
+  curs: &mut Cursor<Vec<u8>>,
+  ctx: PropertyContext,
+) -> Result<()> {
   match val {
     Value::Struct { properties } => {
       for (i, property) in properties.iter().enumerate() {
