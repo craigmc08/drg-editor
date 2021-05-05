@@ -14,6 +14,7 @@ pub use object_imports::*;
 pub use preload_dependencies::*;
 pub use property::*;
 
+use crate::reader::*;
 use anyhow::*;
 use std::io::prelude::Write;
 use std::io::Cursor;
@@ -55,7 +56,7 @@ impl Asset {
   }
 
   pub fn read(uasset: Vec<u8>, uexp: Vec<u8>) -> Result<Self> {
-    let mut cursor_uasset = Cursor::new(uasset);
+    let mut cursor_uasset = ByteReader::new(uasset);
     let summary =
       FileSummary::read(&mut cursor_uasset).with_context(|| format!("Failed to read summary"))?;
     let names = NameMap::read(&mut cursor_uasset, &summary)
@@ -69,7 +70,7 @@ impl Asset {
     let dependencies = PreloadDependencies::read(&mut cursor_uasset, &summary, &imports, &exports)
       .with_context(|| format!("Failed to read preload dependencies"))?;
 
-    let mut cursor_uexp = Cursor::new(uexp);
+    let mut cursor_uexp = ByteReader::new(uexp);
     // Read all export structs
     let mut structs = vec![];
     let ctx = PropertyContext::new(&summary, &names, &imports, &exports);

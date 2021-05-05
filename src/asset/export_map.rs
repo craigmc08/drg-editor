@@ -1,4 +1,5 @@
 use crate::asset::*;
+use crate::reader::*;
 use crate::util::*;
 use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -38,7 +39,7 @@ pub struct ObjectExports {
 
 impl ObjectExport {
   fn read(
-    rdr: &mut Cursor<Vec<u8>>,
+    rdr: &mut ByteReader,
     names: &NameMap,
     _imports: &ObjectImports,
     _exports: &Vec<ObjectExport>,
@@ -126,7 +127,7 @@ impl ObjectExport {
 
 impl ObjectExports {
   pub fn read(
-    rdr: &mut Cursor<Vec<u8>>,
+    rdr: &mut ByteReader,
     summary: &FileSummary,
     names: &NameMap,
     imports: &ObjectImports,

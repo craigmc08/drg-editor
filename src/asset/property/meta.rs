@@ -1,8 +1,8 @@
 use crate::asset::property::context::*;
 use crate::asset::property::prop_type::*;
 use crate::asset::*;
+use crate::reader::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::io::Cursor;
 
 #[derive(Debug, Clone)]
 pub struct Meta {
@@ -20,7 +20,7 @@ impl Meta {
     }
   }
 
-  pub fn deserialize(rdr: &mut Cursor<Vec<u8>>, ctx: PropertyContext) -> Result<Option<Self>> {
+  pub fn deserialize(rdr: &mut ByteReader, ctx: PropertyContext) -> Result<Option<Self>> {
     let name = NameVariant::read(rdr, ctx.names)?;
     if name.to_string() == "None" {
       return Ok(None);

@@ -1,5 +1,8 @@
 use crate::asset::*;
+use crate::reader::*;
+use crate::util::*;
 use anyhow::*;
+pub use context::PropertyContext;
 use std::io::prelude::*;
 
 mod context;
@@ -7,9 +10,6 @@ mod loaders;
 mod meta;
 mod prop_type;
 
-use crate::util::*;
-use context::Curs;
-pub use context::PropertyContext;
 use loaders::{PropertyLoader, LOADERS};
 use meta::*;
 use prop_type::*;
@@ -74,22 +74,31 @@ impl Property {
       .ok_or(anyhow!("No reader for {}", typ))
   }
 
-  pub fn deserialize(rdr: Curs, ctx: PropertyContext) -> Result<Option<Self>> {
+  pub fn deserialize(rdr: &mut ByteReader, ctx: PropertyContext) -> Result<Option<Self>> {
     if let Some(meta) = Meta::deserialize(rdr, ctx)? {
       let loader = Self::get_loader_for(meta.typ)?;
+
       println!("Entering tag for {} at {:#X}", meta.typ, rdr.position());
       let tag = loader.deserialize_tag(rdr, ctx)?;
+
+      // Read 0x00 between tag and value
       rdr.read_exact(&mut [0])?;
+
       println!("Entering value for {} at {:#X}", meta.typ, rdr.position());
+
+      rdr.limit(meta.size as usize);
       let value = loader.deserialize_value(rdr, &tag, meta.size, ctx)?;
+      rdr.unlimit();
+
       println!("Exiting value for {} at {:#X} \n", meta.typ, rdr.position());
+
       Ok(Some(Self { meta, tag, value }))
     } else {
       Ok(None)
     }
   }
 
-  pub fn serialize(&self, curs: Curs, ctx: PropertyContext) -> Result<()> {
+  pub fn serialize(&self, curs: &mut Cursor<Vec<u8>>, ctx: PropertyContext) -> Result<()> {
     let loader = Self::get_loader_for(self.meta.typ)?;
     self.meta.serialize(curs, ctx)?;
     loader.serialize_tag(curs, &self.tag, ctx)?;
@@ -117,7 +126,7 @@ pub struct Properties {
 
 impl Properties {
   pub fn deserialize(
-    rdr: &mut Cursor<Vec<u8>>,
+    rdr: &mut ByteReader,
     export: &ObjectExport,
     ctx: PropertyContext,
   ) -> Result<Self> {
@@ -181,7 +190,7 @@ impl Properties {
     })
   }
 
-  pub fn serialize(&self, curs: Curs, ctx: PropertyContext) -> Result<()> {
+  pub fn serialize(&self, curs: &mut Cursor<Vec<u8>>, ctx: PropertyContext) -> Result<()> {
     for property in &self.properties {
       property
         .serialize(curs, ctx)

@@ -1,4 +1,5 @@
 use crate::asset::*;
+use crate::reader::*;
 use crate::util::*;
 use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt};
@@ -47,7 +48,7 @@ impl Dependency {
   }
 
   pub fn read(
-    rdr: &mut Cursor<Vec<u8>>,
+    rdr: &mut ByteReader,
     imports: &ObjectImports,
     exports: &ObjectExports,
   ) -> Result<Self> {
@@ -95,7 +96,7 @@ pub struct PreloadDependencies {
 
 impl PreloadDependencies {
   pub fn read(
-    rdr: &mut Cursor<Vec<u8>>,
+    rdr: &mut ByteReader,
     summary: &FileSummary,
     imports: &ObjectImports,
     exports: &ObjectExports,

@@ -1,7 +1,4 @@
 use crate::asset::*;
-use std::io::Cursor;
-
-pub type Curs<'a> = &'a mut Cursor<Vec<u8>>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct PropertyContext<'a> {

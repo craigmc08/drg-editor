@@ -1,3 +1,4 @@
+use crate::reader::*;
 use crate::util::*;
 use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
@@ -60,7 +61,7 @@ pub struct FileSummary {
 }
 
 impl Generation {
-  fn read(rdr: &mut Cursor<Vec<u8>>) -> Result<Self> {
+  fn read(rdr: &mut ByteReader) -> Result<Self> {
     let export_count = read_u32(rdr)?;
     let name_count = read_u32(rdr)?;
     Ok(Generation {
@@ -75,7 +76,7 @@ impl Generation {
     Ok(())
   }
 
-  fn read_array(rdr: &mut Cursor<Vec<u8>>) -> Result<Vec<Generation>> {
+  fn read_array(rdr: &mut ByteReader) -> Result<Vec<Generation>> {
     let length = read_u32(rdr)?;
     let mut generations: Vec<Generation> = vec![];
     for _ in 0..length {
@@ -94,7 +95,7 @@ impl Generation {
 }
 
 impl FileSummary {
-  pub fn read(rdr: &mut Cursor<Vec<u8>>) -> Result<Self> {
+  pub fn read(rdr: &mut ByteReader) -> Result<Self> {
     let tag: [u8; 4] = read_bytes(rdr, 4)?;
     let file_version_ue4 = read_u32(rdr)?;
     let file_version_license_ue4 = read_u32(rdr)?;

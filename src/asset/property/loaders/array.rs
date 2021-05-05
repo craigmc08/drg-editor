@@ -4,6 +4,7 @@ use crate::asset::property::meta::*;
 use crate::asset::property::prop_type::*;
 use crate::asset::*;
 use crate::loader;
+use crate::reader::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::prelude::*;
 
@@ -17,14 +18,14 @@ pub const LOADER_ARRAY: PropertyLoader = loader!(
   |_| 8,
 );
 
-fn deserialize_array_tag(rdr: Curs, ctx: PropertyContext) -> Result<Tag> {
+fn deserialize_array_tag(rdr: &mut ByteReader, ctx: PropertyContext) -> Result<Tag> {
   let inner_type = PropType::deserialize(rdr, ctx)?;
   Ok(Tag::Array { inner_type })
 }
 
 /// # Panics
 /// If `tag` is not Array variant.
-fn serialize_array_tag(tag: &Tag, curs: Curs, ctx: PropertyContext) -> Result<()> {
+fn serialize_array_tag(tag: &Tag, curs: &mut Cursor<Vec<u8>>, ctx: PropertyContext) -> Result<()> {
   if let Tag::Array { inner_type } = tag {
     inner_type.serialize(curs, ctx)?;
     Ok(())
@@ -35,7 +36,12 @@ fn serialize_array_tag(tag: &Tag, curs: Curs, ctx: PropertyContext) -> Result<()
 
 /// # Panics
 /// If `tag` is not Array variant.
-fn deserialize_array(rdr: Curs, tag: &Tag, max_size: u64, ctx: PropertyContext) -> Result<Value> {
+fn deserialize_array(
+  rdr: &mut ByteReader,
+  tag: &Tag,
+  max_size: u64,
+  ctx: PropertyContext,
+) -> Result<Value> {
   if let Tag::Array { inner_type } = tag {
     let count = rdr.read_u32::<LittleEndian>()?;
     let loader = Property::get_loader_for(*inner_type).with_context(|| "Array.inner_type")?;
@@ -71,7 +77,12 @@ fn deserialize_array(rdr: Curs, tag: &Tag, max_size: u64, ctx: PropertyContext) 
 
 /// # Panics
 /// If `val` is not Array variant or `tag` is not Array variant.
-fn serialize_array(val: &Value, tag: &Tag, curs: Curs, ctx: PropertyContext) -> Result<()> {
+fn serialize_array(
+  val: &Value,
+  tag: &Tag,
+  curs: &mut Cursor<Vec<u8>>,
+  ctx: PropertyContext,
+) -> Result<()> {
   if let (
     Value::Array {
       inner_meta,
