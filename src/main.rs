@@ -1,7 +1,7 @@
 // #![windows_subsystem = "windows"]
 
 mod asset;
-// mod bindings;
+mod bindings;
 // mod editor;
 mod reader;
 mod util;

@@ -1,57 +1,41 @@
+use crate::asset::property::meta::*;
+use crate::asset::property::prop_type::*;
 use crate::asset::*;
 
-/// Represents a value that can be turned into a named property
+/// Represents a value that can be turned into the parts of a property
 pub trait AsProperty {
-  fn as_property<T: Into<NameVariant>>(&self, name: T) -> Property;
-  fn as_nested_value<T: Into<NameVariant>>(&self, name: T) -> NestedValue {
-    let prop = self.as_property(name);
-    if prop.tag.is_complex_array_value() {
-      NestedValue::Complex { value: Some(prop) }
-    } else {
-      NestedValue::Simple { value: prop.value }
-    }
-  }
-}
+  fn prop_type(&self) -> PropType;
+  fn as_tag(&self) -> Tag;
+  fn as_value(&self) -> Value;
 
-// Represents a value that can be turned into a property iwth a statically
-// known tag. Use this to implement [`AsProperty`] with less boilerplate.
-pub trait IsProperty {
-  fn tag() -> PropertyTag;
-  fn to_property<T: Into<NameVariant>>(&self, name: T) -> Property;
-}
-
-/// For properties without `tag_data`, you can use this trait to implement
-/// [`IsProperty`] with less boilerplate
-pub trait IsSimpleProperty {
-  fn tag() -> PropertyTag;
-  fn to_simple_property(&self) -> PropertyValue;
-}
-
-impl<T> IsProperty for T
-where
-  T: IsSimpleProperty,
-{
-  fn tag() -> PropertyTag {
-    <Self as IsSimpleProperty>::tag()
-  }
-  fn to_property<U: Into<NameVariant>>(&self, name: U) -> Property {
-    let value = self.to_simple_property();
+  fn as_property<T: Into<NameVariant>>(&self, name: T) -> Property {
     Property {
-      name: name.into(),
-      tag: Self::tag(),
-      size: value.byte_size() as u64,
-      tag_data: PropertyTagData::EmptyTag { tag: Self::tag() },
-      value,
+      // Size doesn't matter
+      meta: Meta::new(name, self.prop_type(), 0),
+      tag: self.as_tag(),
+      value: self.as_value(),
     }
   }
+}
+
+// Represents a value that can be turned into a property with a simple tag
+pub trait AsSimpleProperty {
+  fn prop_type() -> PropType;
+  fn as_value(&self) -> Value;
 }
 
 impl<T> AsProperty for T
 where
-  T: IsProperty,
+  T: AsSimpleProperty,
 {
-  fn as_property<U: Into<NameVariant>>(&self, name: U) -> Property {
-    self.to_property(name.into())
+  fn prop_type(&self) -> PropType {
+    <Self as AsSimpleProperty>::prop_type()
+  }
+  fn as_tag(&self) -> Tag {
+    Tag::Simple(self.prop_type())
+  }
+  fn as_value(&self) -> Value {
+    <Self as AsSimpleProperty>::as_value(self)
   }
 }
 
@@ -61,22 +45,19 @@ where
   Self: std::marker::Sized,
 {
   fn from_property(property: &Property) -> Option<Self>;
+}
 
-  /// Assumes that [`Self::from_property`] if, as a nested value, T is a
-  /// Simple, then it only cares about `property.value`.
-  fn from_nested_value(value: &NestedValue) -> Option<Self> {
-    match value {
-      NestedValue::Complex { value } => value.as_ref().and_then(|prop| Self::from_property(prop)),
-      NestedValue::Simple { value } => Self::from_property(&Property {
-        name: NameVariant::new("", 0),
-        tag: PropertyTag::ByteProperty,
-        tag_data: PropertyTagData::EmptyTag {
-          tag: PropertyTag::ByteProperty,
-        },
-        size: 0,
-        value: value.clone(),
-      }),
-    }
+/// Represents a value that can be created from a value
+pub trait FromValue
+where
+  Self: std::marker::Sized,
+{
+  fn from_value(value: &Value) -> Option<Self>;
+}
+
+impl<T: FromValue> FromProperty for T {
+  fn from_property(property: &Property) -> Option<Self> {
+    Self::from_value(&property.value)
   }
 }
 
@@ -91,11 +72,11 @@ impl Property {
   }
 }
 
-impl Struct {
+impl Properties {
   /// Get the value of a property by name
   pub fn get<T: FromProperty>(&self, name: &str) -> Option<T> {
     for prop in self.properties.iter() {
-      if prop.name == NameVariant::parse(name) {
+      if prop.meta.name == NameVariant::parse(name) {
         return T::from_property(prop);
       }
     }
@@ -106,7 +87,11 @@ impl Struct {
   pub fn set<T: AsProperty>(&mut self, name: &str, value: T) -> () {
     let name = NameVariant::parse(name);
     let new_prop = value.as_property(name.clone());
-    match self.properties.iter().position(|prop| prop.name == name) {
+    match self
+      .properties
+      .iter()
+      .position(|prop| prop.meta.name == name)
+    {
       None => {
         self.properties.push(new_prop);
       }
@@ -192,7 +177,7 @@ impl Asset {
   /// Attempt to borrow an exported Struct by name.
   ///
   /// To borrow the Struct as mutable, see [Self::get_struct_mut]
-  pub fn get_struct(&self, name: &str) -> Option<&Struct> {
+  pub fn get_struct(&self, name: &str) -> Option<&Properties> {
     let name = NameVariant::parse(name);
     match self
       .exports
@@ -206,7 +191,7 @@ impl Asset {
   }
 
   /// Attempt to borrow as mutable an exported Struct by name.
-  pub fn get_struct_mut(&mut self, name: &str) -> Option<&mut Struct> {
+  pub fn get_struct_mut(&mut self, name: &str) -> Option<&mut Properties> {
     let name = NameVariant::parse(name);
     match self
       .exports
@@ -224,310 +209,100 @@ impl Asset {
 // TRAIT IMPLEMENTATIONS
 //======================
 
-// TODO can't implement tag for Property: AsProperty
-impl FromProperty for Property {
-  fn from_property(property: &Property) -> Option<Self> {
-    Some(property.clone())
+impl AsProperty for bool {
+  fn prop_type(&self) -> PropType {
+    PropType::BoolProperty
   }
-}
-
-impl IsProperty for bool {
-  fn tag() -> PropertyTag {
-    PropertyTag::BoolProperty
+  fn as_tag(&self) -> Tag {
+    Tag::Bool(*self)
   }
-  fn to_property<T: Into<NameVariant>>(&self, name: T) -> Property {
-    Property {
-      name: name.into(),
-      tag: Self::tag(),
-      size: 0,
-      tag_data: PropertyTagData::BoolTag { value: *self },
-      value: PropertyValue::BoolProperty {},
-    }
+  fn as_value(&self) -> Value {
+    Value::Bool
   }
 }
 impl FromProperty for bool {
   fn from_property(property: &Property) -> Option<Self> {
-    match property.tag_data {
-      PropertyTagData::BoolTag { value } => Some(value),
+    match &property.tag {
+      Tag::Bool(value) => Some(*value),
       _ => None,
     }
   }
 }
 
-impl IsSimpleProperty for u8 {
-  fn tag() -> PropertyTag {
-    PropertyTag::ByteProperty
+impl AsSimpleProperty for i32 {
+  fn prop_type() -> PropType {
+    PropType::IntProperty
   }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::ByteProperty { value: *self }
+  fn as_value(&self) -> Value {
+    Value::Int(*self)
   }
 }
-impl FromProperty for u8 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match property.value {
-      PropertyValue::ByteProperty { value } => Some(value),
+impl FromValue for i32 {
+  fn from_value(value: &Value) -> Option<Self> {
+    match value {
+      Value::Int(value) => Some(*value),
       _ => None,
     }
   }
 }
 
-impl IsSimpleProperty for u16 {
-  fn tag() -> PropertyTag {
-    PropertyTag::UInt16Property
+impl AsSimpleProperty for f32 {
+  fn prop_type() -> PropType {
+    PropType::FloatProperty
   }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::UInt16Property { value: *self }
+  fn as_value(&self) -> Value {
+    Value::Float(*self)
   }
 }
-impl FromProperty for u16 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match property.value {
-      PropertyValue::UInt16Property { value } => Some(value),
+impl FromValue for f32 {
+  fn from_value(value: &Value) -> Option<Self> {
+    match value {
+      Value::Float(value) => Some(*value),
       _ => None,
     }
   }
 }
 
-impl IsSimpleProperty for u32 {
-  fn tag() -> PropertyTag {
-    PropertyTag::UInt32Property
-  }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::UInt32Property { value: *self }
-  }
-}
-impl FromProperty for u32 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match property.value {
-      PropertyValue::UInt32Property { value } => Some(value),
-      _ => None,
-    }
-  }
-}
-
-impl IsSimpleProperty for u64 {
-  fn tag() -> PropertyTag {
-    PropertyTag::UInt64Property
-  }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::UInt64Property { value: *self }
-  }
-}
-impl FromProperty for u64 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match property.value {
-      PropertyValue::UInt64Property { value } => Some(value),
-      _ => None,
-    }
-  }
-}
-
-impl IsSimpleProperty for i8 {
-  fn tag() -> PropertyTag {
-    PropertyTag::Int8Property
-  }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::Int8Property { value: *self }
-  }
-}
-impl FromProperty for i8 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match property.value {
-      PropertyValue::Int8Property { value } => Some(value),
-      _ => None,
-    }
-  }
-}
-
-impl IsSimpleProperty for i16 {
-  fn tag() -> PropertyTag {
-    PropertyTag::Int16Property
-  }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::Int16Property { value: *self }
-  }
-}
-impl FromProperty for i16 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match property.value {
-      PropertyValue::Int16Property { value } => Some(value),
-      _ => None,
-    }
-  }
-}
-
-impl IsSimpleProperty for i32 {
-  fn tag() -> PropertyTag {
-    PropertyTag::IntProperty
-  }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::IntProperty { value: *self }
-  }
-}
-impl FromProperty for i32 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match property.value {
-      PropertyValue::IntProperty { value } => Some(value),
-      _ => None,
-    }
-  }
-}
-
-impl IsSimpleProperty for i64 {
-  fn tag() -> PropertyTag {
-    PropertyTag::Int64Property
-  }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::Int64Property { value: *self }
-  }
-}
-impl FromProperty for i64 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match property.value {
-      PropertyValue::Int64Property { value } => Some(value),
-      _ => None,
-    }
-  }
-}
-
-impl IsSimpleProperty for f32 {
-  fn tag() -> PropertyTag {
-    PropertyTag::FloatProperty
-  }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::FloatProperty { value: *self }
-  }
-}
-impl FromProperty for f32 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match property.value {
-      PropertyValue::FloatProperty { value } => Some(value),
-      _ => None,
-    }
-  }
-}
-
-impl IsSimpleProperty for f64 {
-  fn tag() -> PropertyTag {
-    PropertyTag::DoubleProperty
-  }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::DoubleProperty { value: *self }
-  }
-}
-impl FromProperty for f64 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match property.value {
-      PropertyValue::DoubleProperty { value } => Some(value),
-      _ => None,
-    }
-  }
-}
-
-impl IsSimpleProperty for String {
-  fn tag() -> PropertyTag {
-    PropertyTag::StrProperty
-  }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::StrProperty {
-      value: self.to_string(),
-    }
-  }
-}
-impl FromProperty for String {
-  fn from_property(property: &Property) -> Option<Self> {
-    match &property.value {
-      PropertyValue::StrProperty { value } => Some(value.clone()),
-      _ => None,
-    }
-  }
-}
-
-/// Attempts to convert a vector of AsProperty's into an ArrayType.
-///
-/// # Panics
-///
-/// Panics if the vector is empty.
-///
-/// It produces a broken property if the tags of each T are not the same.
-pub fn vec_as_property_unsafe<T: AsProperty>(vec: &Vec<T>, name: NameVariant) -> Property {
-  if vec.len() < 1 {
-    panic!();
-  }
-  let values: Vec<NestedValue> = vec
-    .iter()
-    .map(|t| t.as_nested_value(name.clone()))
-    .collect();
-  let value_tag = match &values[0] {
-    NestedValue::Complex { value: Some(value) } => value.tag,
-    NestedValue::Simple { value } => value.tag(),
-    _ => panic!(),
-  };
-  let size = values.iter().map(|nv| nv.byte_size()).sum::<usize>() + 4;
-  Property {
-    name,
-    tag: PropertyTag::ArrayProperty,
-    size: size as u64,
-    tag_data: PropertyTagData::ArrayTag { value_tag },
-    value: PropertyValue::ArrayProperty { values },
-  }
-}
-
-impl<T> IsProperty for Vec<T>
+impl<T> AsProperty for Vec<T>
 where
-  T: IsProperty,
+  T: AsProperty,
 {
-  fn tag() -> PropertyTag {
-    PropertyTag::ArrayProperty
+  fn prop_type(&self) -> PropType {
+    PropType::ArrayProperty
   }
-  fn to_property<U: Into<NameVariant>>(&self, name: U) -> Property {
-    let name = name.into();
-    let tag_data = PropertyTagData::ArrayTag {
-      value_tag: T::tag(),
-    };
-    // TODO: what name to past to children?
-    let array: Vec<NestedValue> = self
-      .iter()
-      .map(|t| t.as_nested_value(name.clone()))
-      .collect();
-    let size = array.iter().map(|nv| nv.byte_size()).sum::<usize>() + 4;
-    Property {
-      name,
-      tag: Self::tag(),
-      size: size as u64,
-      tag_data,
-      value: PropertyValue::ArrayProperty { values: array },
-    }
+  fn as_tag(&self) -> Tag {
+    let inner_type = self[0].prop_type();
+    Tag::Array { inner_type }
+  }
+  fn as_value(&self) -> Value {
+    let values: Vec<Value> = self.iter().map(|t| t.as_value()).collect();
+    Value::Array { values }
   }
 }
-impl<T> FromProperty for Vec<Option<T>>
+impl<T> FromValue for Vec<T>
 where
-  T: FromProperty,
+  T: FromValue,
 {
-  fn from_property(property: &Property) -> Option<Self> {
-    match &property.value {
-      PropertyValue::ArrayProperty { values } => {
-        Some(values.iter().map(|nv| T::from_nested_value(nv)).collect())
-      }
+  fn from_value(value: &Value) -> Option<Self> {
+    match &value {
+      Value::Array { values } => Some(values.iter().filter_map(|v| T::from_value(v)).collect()),
       _ => None,
     }
   }
 }
 
-impl IsSimpleProperty for Dependency {
-  fn tag() -> PropertyTag {
-    PropertyTag::ObjectProperty
+impl AsSimpleProperty for Dependency {
+  fn prop_type() -> PropType {
+    PropType::ObjectProperty
   }
-  fn to_simple_property(&self) -> PropertyValue {
-    PropertyValue::ObjectProperty {
-      value: self.clone(),
-    }
+  fn as_value(&self) -> Value {
+    Value::Object(self.clone())
   }
 }
-impl FromProperty for Dependency {
-  fn from_property(property: &Property) -> Option<Self> {
-    match &property.value {
-      PropertyValue::ObjectProperty { value } => Some(value.clone()),
+impl FromValue for Dependency {
+  fn from_value(value: &Value) -> Option<Self> {
+    match &value {
+      Value::Object(value) => Some(value.clone()),
       _ => None,
     }
   }
