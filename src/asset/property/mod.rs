@@ -7,8 +7,8 @@ use std::io::prelude::*;
 
 mod context;
 mod loaders;
-mod meta;
-mod prop_type;
+pub mod meta;
+pub mod prop_type;
 
 use loaders::{PropertyLoader, LOADERS};
 use meta::*;
@@ -91,7 +91,12 @@ impl Property {
 
   pub fn serialize(&self, curs: &mut Cursor<Vec<u8>>, ctx: PropertyContext) -> Result<()> {
     let loader = Self::get_loader_for(self.meta.typ)?;
-    self.meta.serialize(curs, ctx)?;
+
+    // Compute real size
+    let new_size = self.byte_size() - self.meta.byte_size();
+    let meta = Meta::new(self.meta.name.clone(), self.meta.typ, new_size as u64);
+    meta.serialize(curs, ctx)?;
+
     loader.serialize_tag(curs, &self.tag, ctx)?;
     curs.write(&[0])?;
     loader.serialize_value(curs, &self.value, &self.tag, ctx)?;
