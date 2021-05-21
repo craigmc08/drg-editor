@@ -5,6 +5,7 @@ use crate::asset::property::prop_type::*;
 use crate::asset::*;
 use crate::loader;
 use crate::reader::*;
+use crate::util::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::prelude::*;
 
@@ -34,6 +35,9 @@ fn serialize_array_tag(tag: &Tag, curs: &mut Cursor<Vec<u8>>, ctx: PropertyConte
   }
 }
 
+/// Current version does not attempt to parse non-simple inner values, e.g.
+/// Struct. In this case, it will return a RawData value.
+///
 /// # Panics
 /// If `tag` is not Array variant.
 fn deserialize_array(
@@ -43,93 +47,74 @@ fn deserialize_array(
   ctx: PropertyContext,
 ) -> Result<Value> {
   if let Tag::Array { inner_type } = tag {
-    let count = rdr.read_u32::<LittleEndian>()?;
     let loader = Property::get_loader_for(*inner_type).with_context(|| "Array.inner_type")?;
 
-    let (inner_meta, inner_tag, inner_max_size) = if loader.simple {
-      (None, Tag::Simple(*inner_type), max_size)
+    if loader.simple {
+      let count = rdr.read_u32::<LittleEndian>()?;
+      let inner_tag = Tag::Simple(*inner_type);
+      let mut values = vec![];
+      for i in 0..count {
+        let value = (loader.deserialize_value)(rdr, &inner_tag, max_size, ctx)
+          .with_context(|| format!("Array[{}]", i))?;
+        values.push(value);
+      }
+      Ok(Value::Array { values })
     } else {
-      // TODO: might want to .ok the meta deserialization.
-      // not sure if this will cause problems how it is.
-      let meta = Meta::deserialize(rdr, ctx)?;
-      let inner_tag = (loader.deserialize_tag)(rdr, ctx)?;
-      rdr.read_exact(&mut [0])?;
-      let inner_max_size = meta.as_ref().map(|m| m.size).unwrap_or(0); // TODO this unwrap shouldn't fail?
-      (meta, inner_tag, inner_max_size)
-    };
-
-    let mut values = vec![];
-    for i in 0..count {
-      let value = (loader.deserialize_value)(rdr, &inner_tag, inner_max_size, ctx)
-        .with_context(|| format!("Array[{}]", i))?;
-      values.push(value);
+      let data: Vec<u8> = read_bytes(rdr, max_size as usize)?;
+      Ok(Value::RawData { data })
     }
-
-    Ok(Value::Array {
-      inner_meta,
-      inner_tag,
-      values,
-    })
   } else {
     unreachable!()
   }
 }
 
 /// # Panics
-/// If `val` is not Array variant or `tag` is not Array variant.
+/// If `val` is not Array or RawData variant or `tag` is not Array variant.
 fn serialize_array(
   val: &Value,
   tag: &Tag,
   curs: &mut Cursor<Vec<u8>>,
   ctx: PropertyContext,
 ) -> Result<()> {
-  if let (
-    Value::Array {
-      inner_meta,
-      inner_tag,
-      values,
-    },
-    Tag::Array { inner_type },
-  ) = (val, tag)
-  {
-    let loader = Property::get_loader_for(*inner_type).with_context(|| "Array.inner_type")?;
-    if let Some(meta) = inner_meta {
-      meta.serialize(curs, ctx)?;
+  match (val, tag) {
+    (Value::Array { values }, Tag::Array { inner_type }) => {
+      let inner_tag = Tag::Simple(*inner_type);
+      let loader = Property::get_loader_for(*inner_type).with_context(|| "Array.inner_type")?;
+      let len = values.len();
+      curs.write_u32::<LittleEndian>(len as u32)?;
+      for (i, value) in values.iter().enumerate() {
+        loader
+          .serialize_value(curs, value, &inner_tag, ctx)
+          .with_context(|| format!("Array[{}]", i))?;
+      }
+      Ok(())
     }
-    (loader.serialize_tag)(inner_tag, curs, ctx)?;
-    let len = values.len();
-    curs.write_u32::<LittleEndian>(len as u32)?;
-    for (i, value) in values.iter().enumerate() {
-      (loader.serialize_value)(value, inner_tag, curs, ctx)
-        .with_context(|| format!("Array[{}]", i))?;
+    (Value::RawData { data }, _) => {
+      curs.write(data)?;
+      Ok(())
     }
-    Ok(())
-  } else {
-    unreachable!()
+    _ => {
+      unreachable!()
+    }
   }
 }
 
+/// # Panics
+/// Panics if value is not Array or RawData or Tag is not Array
 fn value_size_array(value: &Value, tag: &Tag) -> usize {
-  if let (
-    Value::Array {
-      inner_meta,
-      inner_tag,
-      values,
-    },
-    Tag::Array { inner_type },
-  ) = (value, tag)
-  {
-    let loader = Property::get_loader_for(*inner_type).expect("Unreachable");
-    let meta_size = inner_meta.as_ref().map(Meta::byte_size).unwrap_or(0);
-    let tag_size = (loader.tag_size)(&inner_tag);
-    let values_size = values
-      .iter()
-      .map(|v| (loader.value_size)(v, &inner_tag))
-      .sum::<usize>();
-
-    // Meta + tag + length + values
-    meta_size + tag_size + 4 + values_size
-  } else {
-    unreachable!()
+  match (value, tag) {
+    (Value::Array { values }, Tag::Array { inner_type }) => {
+      let inner_tag = Tag::Simple(*inner_type);
+      let loader = Property::get_loader_for(*inner_type).expect("Unreachable");
+      let values_size = values
+        .iter()
+        .map(|v| (loader.value_size)(v, &inner_tag))
+        .sum::<usize>();
+      values_size
+    }
+    (Value::RawData { data }, _) => data.len(),
+    _ => {
+      unreachable!()
+    }
   }
 }

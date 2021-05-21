@@ -23,25 +23,16 @@ pub enum Value {
   Int(i32),
   Float(f32),
   Object(Dependency),
-  SoftObject {
-    object_name: NameVariant,
-    unk1: u32,
-  },
+  // TODO: unk1 might be the length of a string that is stored in the SoftObjectProperty
+  // Find example of this happening?
+  SoftObject { object_name: NameVariant, unk1: u32 },
   Name(NameVariant),
 
   Bool,
   Enum(NameVariant), // For ByteProperty and EnumProperty, TODO better name?
-  Array {
-    inner_meta: Option<Meta>,
-    inner_tag: Tag,
-    values: Vec<Value>,
-  },
-  Struct {
-    properties: Vec<Property>,
-  },
-  RawData {
-    data: Vec<u8>,
-  },
+  Array { values: Vec<Value> },
+  Struct { properties: Vec<Property> },
+  RawData { data: Vec<u8> },
   // etc.
 }
 
