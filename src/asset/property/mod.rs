@@ -18,7 +18,7 @@ use prop_type::*;
 // Property Components
 ====================*/
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Value {
   Int(i32),
   Float(f32),
@@ -27,6 +27,7 @@ pub enum Value {
   // Find example of this happening?
   SoftObject { object_name: NameVariant, unk1: u32 },
   Name(NameVariant),
+  Str(String),
 
   Bool,
   Enum(NameVariant), // For ByteProperty and EnumProperty, TODO better name?
@@ -36,7 +37,7 @@ pub enum Value {
   // etc.
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Tag {
   Simple(PropType),
   Bool(bool),
@@ -50,7 +51,7 @@ pub enum Tag {
   }, // Etc.
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Property {
   pub meta: Meta,
   pub tag: Tag,

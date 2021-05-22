@@ -1,3 +1,5 @@
+use crate::asset::property::meta::*;
+use crate::asset::property::prop_type::*;
 use crate::asset::*;
 use crate::bindings::*;
 use crate::editor::internal::*;
@@ -12,7 +14,7 @@ pub enum PluginType {
     dep: Dependency,
   },
   PluginArray {
-    value_tag: PropertyTag,
+    value_type: PropType,
     sub_editors: Vec<EditorPlugin>,
   },
   PluginBool {
@@ -31,16 +33,15 @@ pub enum PluginType {
 
 impl PluginType {
   fn to_property(&self, original: &Property) -> Property {
+    let name = original.meta.name.clone();
     match self {
       Self::PluginNone { .. } => original.clone(),
-      Self::PluginObject { dep } => dep.as_property(original.name.clone()),
-      Self::PluginArray { sub_editors, .. } => {
-        vec_as_property_unsafe(sub_editors, original.name.clone())
-      }
-      Self::PluginBool { value } => value.as_property(original.name.clone()),
-      Self::PluginFloat { value } => value.as_property(original.name.clone()),
-      Self::PluginInt { value } => value.as_property(original.name.clone()),
-      Self::PluginStr { value } => value.to_string().as_property(original.name.clone()),
+      Self::PluginObject { dep } => dep.as_property(name),
+      Self::PluginArray { sub_editors, .. } => sub_editors.as_property(name),
+      Self::PluginBool { value } => value.as_property(name),
+      Self::PluginFloat { value } => value.as_property(name),
+      Self::PluginInt { value } => value.as_property(name),
+      Self::PluginStr { value } => value.to_string().as_property(name),
     }
   }
 }
@@ -53,46 +54,44 @@ pub struct EditorPlugin {
 impl EditorPlugin {
   pub fn new(property: &Property) -> Self {
     let plugin = match &property.value {
-      PropertyValue::ObjectProperty { value } => PluginType::PluginObject { dep: value.clone() },
-      PropertyValue::ArrayProperty { values } => {
-        if let PropertyTagData::ArrayTag { value_tag } = property.tag_data {
+      Value::Object(value) => PluginType::PluginObject { dep: value.clone() },
+      Value::Array { values } => {
+        if let Tag::Array { inner_type } = property.tag {
           let mut sub_editors = vec![];
-          for editor in values.iter().map(EditorPlugin::new_from_nv) {
-            if let Some(editor) = editor {
-              sub_editors.push(editor);
-            } else {
-              return EditorPlugin {
-                original: property.clone(),
-                plugin: PluginType::PluginNone {
-                  reason: format!("Empty value in array"),
-                },
-              };
-            }
+          // let sub_editors =
+          for editor in values.iter().map(|v| {
+            Self::new(&Property {
+              meta: property.meta.clone(),
+              tag: property.tag.clone(),
+              value: v.clone(),
+            })
+          }) {
+            sub_editors.push(editor);
           }
           PluginType::PluginArray {
-            value_tag,
+            value_type: inner_type,
             sub_editors,
           }
         } else {
           unreachable!()
         }
       }
-      PropertyValue::BoolProperty {} => {
-        if let PropertyTagData::BoolTag { value } = property.tag_data {
+      Value::Bool {} => {
+        if let Tag::Bool(value) = property.tag {
           PluginType::PluginBool { value }
         } else {
           unreachable!()
         }
       }
-      PropertyValue::FloatProperty { value } => PluginType::PluginFloat { value: *value },
-      PropertyValue::IntProperty { value } => PluginType::PluginInt { value: *value },
-      PropertyValue::StrProperty { value } => {
+      Value::Float(value) => PluginType::PluginFloat { value: *value },
+      Value::Int(value) => PluginType::PluginInt { value: *value },
+      Value::Str(value) => {
         let mut str = ImString::from(value.clone());
         str.reserve(64);
         PluginType::PluginStr { value: str }
       }
       _ => PluginType::PluginNone {
-        reason: format!("Unsupported property type {:?}", property.tag),
+        reason: format!("Unsupported property type {}", property.meta.typ),
       },
     };
     EditorPlugin {
@@ -105,7 +104,10 @@ impl EditorPlugin {
   pub fn input(&mut self, ui: &Ui, asset: &Asset) -> bool {
     match &mut self.plugin {
       PluginType::PluginNone { reason } => {
-        ui.text(format!("Can't edit {}: {}", self.original.name, reason));
+        ui.text(format!(
+          "Can't edit {}: {}",
+          self.original.meta.name, reason
+        ));
         false
       }
       PluginType::PluginObject { dep } => {
@@ -117,7 +119,7 @@ impl EditorPlugin {
         }
       }
       PluginType::PluginArray {
-        value_tag,
+        value_type,
         sub_editors,
       } => {
         let mut changed = false;
@@ -147,9 +149,8 @@ impl EditorPlugin {
         // Add button
         if ui.button(im_str!("Add Element"), [0.0, 0.0]) {
           changed = true;
-          if let Some(sub_editor) = EditorPlugin::new_from_nv(&NestedValue::new(*value_tag)) {
-            sub_editors.push(sub_editor);
-          }
+          let sub_editor = EditorPlugin::default_from_type(*value_type);
+          sub_editors.push(sub_editor);
         }
 
         changed
@@ -172,28 +173,40 @@ impl EditorPlugin {
     }
   }
 
-  fn new_from_nv(nv: &NestedValue) -> Option<Self> {
-    match nv {
-      NestedValue::Simple { value } => Some(Self::new(&Property {
-        // Every field except value doesn't matter
-        name: "".into(),
-        tag: PropertyTag::ByteProperty,
-        size: 0,
-        tag_data: PropertyTagData::EmptyTag {
-          tag: PropertyTag::ByteProperty,
-        },
-        value: value.clone(),
-      })),
-      NestedValue::Complex { value: Some(value) } => Some(Self::new(value)),
-      NestedValue::Complex { .. } => None,
-    }
+  pub fn default_from_type(typ: PropType) -> Self {
+    let (tag, value) = match typ {
+      PropType::ObjectProperty => (Tag::Simple(typ), Value::Object(Dependency::uobject())),
+      PropType::BoolProperty => (Tag::Bool(false), Value::Bool),
+      PropType::IntProperty => (Tag::Simple(typ), Value::Int(0)),
+      PropType::FloatProperty => (Tag::Simple(typ), Value::Float(0.0)),
+      PropType::StrProperty => (Tag::Simple(typ), Value::Str("".to_string())),
+      // TODO ArrayProperty
+      // TODO StructProperty
+      _ => {
+        return Self {
+          original: Property {
+            meta: Meta::new("", typ, 0),
+            tag: Tag::Simple(typ),
+            value: Value::Bool,
+          },
+          plugin: PluginType::PluginNone {
+            reason: format!("Can't create new {}", typ),
+          },
+        };
+      }
+    };
+    Self::new(&Property {
+      meta: Meta::new("", typ, 0),
+      tag,
+      value,
+    })
   }
 
-  pub fn save(&self, strct: &mut Struct) {
+  pub fn save(&self, strct: &mut Properties) {
     if let Some(i) = strct
       .properties
       .iter()
-      .position(|prop| prop.name == self.original.name)
+      .position(|prop| prop.meta.name == self.original.meta.name)
     {
       strct.properties[i] = self.plugin.to_property(&self.original);
     }
@@ -201,8 +214,14 @@ impl EditorPlugin {
 }
 
 impl AsProperty for EditorPlugin {
-  fn as_property<T: Into<NameVariant>>(&self, _name: T) -> Property {
-    self.plugin.to_property(&self.original)
+  fn prop_type(&self) -> PropType {
+    self.plugin.to_property(&self.original).meta.typ
+  }
+  fn as_tag(&self) -> Tag {
+    self.plugin.to_property(&self.original).tag
+  }
+  fn as_value(&self) -> Value {
+    self.plugin.to_property(&self.original).value
   }
 }
 impl FromProperty for EditorPlugin {

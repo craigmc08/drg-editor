@@ -277,10 +277,10 @@ fn draw_property_selector(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut E
       let strct = &editor.asset.structs[idx];
       for prop in &strct.properties {
         let active =
-          Some(prop.name.clone()) == editor.selected_property.as_ref().map(|s| s.name.clone());
-        if ui.radio_button_bool(&ImString::from(prop.name.to_string()), active) && !active {
+          Some(prop.meta.name.clone()) == editor.selected_property.as_ref().map(|s| s.name.clone());
+        if ui.radio_button_bool(&ImString::from(prop.meta.name.to_string()), active) && !active {
           editor.selected_property = Some(SelectedProperty {
-            name: prop.name.clone(),
+            name: prop.meta.name.clone(),
             dirty: false,
             plugin: EditorPlugin::new(prop),
             struct_idx: idx,
