@@ -145,7 +145,7 @@ impl EditorPlugin {
         false
       }
       PluginType::PluginObject { dep } => {
-        if let Some(new_dep) = input_dependency(ui, "ObjectProperty", asset, dep.clone()) {
+        if let Some(new_dep) = input_dependency(ui, "ObjectProperty", &asset.header, dep.clone()) {
           *dep = new_dep;
           true
         } else {

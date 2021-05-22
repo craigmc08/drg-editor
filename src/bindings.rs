@@ -102,7 +102,7 @@ impl Properties {
   }
 }
 
-impl Asset {
+impl AssetHeader {
   /// Import an object into the asset
   ///
   /// # Arguments
@@ -173,6 +173,18 @@ impl Asset {
       .map(|export| export.object_name.clone())
       .collect()
   }
+}
+
+impl Asset {
+  // List all imports
+  pub fn list_imports(&self) -> &Vec<ObjectImport> {
+    &self.header.list_imports()
+  }
+
+  /// List the names of all exports
+  pub fn list_exports(&self) -> Vec<NameVariant> {
+    self.header.list_exports()
+  }
 
   /// Attempt to borrow an exported Struct by name.
   ///
@@ -180,13 +192,13 @@ impl Asset {
   pub fn get_struct(&self, name: &str) -> Option<&Properties> {
     let name = NameVariant::parse(name);
     match self
-      .exports
+      .exports()
       .exports
       .iter()
       .position(|exp| exp.object_name == name)
     {
       None => None,
-      Some(i) => Some(&self.structs[i]),
+      Some(i) => Some(&self.structs()[i]),
     }
   }
 
@@ -194,13 +206,13 @@ impl Asset {
   pub fn get_struct_mut(&mut self, name: &str) -> Option<&mut Properties> {
     let name = NameVariant::parse(name);
     match self
-      .exports
+      .exports()
       .exports
       .iter()
       .position(|exp| exp.object_name == name)
     {
       None => None,
-      Some(i) => Some(&mut self.structs[i]),
+      Some(i) => Some(&mut self.structs_mut()[i]),
     }
   }
 }
