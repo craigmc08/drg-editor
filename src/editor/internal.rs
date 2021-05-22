@@ -1,6 +1,7 @@
 use crate::asset::*;
 use crate::editor::plugins::*;
 use imgui::*;
+use std::path::Path;
 
 pub struct EditableImport {
   pub class_package: ImString,
@@ -27,27 +28,49 @@ pub struct SelectedProperty {
   pub plugin: EditorPlugin,
 }
 
-pub struct State {
-  pub editor: Option<Editor>,
-  pub err: Option<anyhow::Error>,
-}
-
-pub struct Editor {
-  pub asset: Asset,
+#[derive(Default)]
+pub struct ImportEditor {
   pub new_import: Option<EditableImport>,
   pub selected_import: Option<NameVariant>,
+}
+
+#[derive(Default)]
+pub struct ExportEditor {
   pub selected_export: Option<NameVariant>,
   pub selected_property: Option<SelectedProperty>,
 }
 
+pub enum State {
+  None,
+  Header {
+    header: AssetHeader,
+    path: Box<Path>,
+    import_editor: ImportEditor,
+  },
+  Asset {
+    asset: Asset,
+    path: Box<Path>,
+    import_editor: ImportEditor,
+    export_editor: ExportEditor,
+  },
+}
+
+impl Default for State {
+  fn default() -> Self {
+    State::None
+  }
+}
+
+pub struct Editor {
+  pub state: State,
+  pub err: Option<anyhow::Error>,
+}
+
 impl Editor {
-  pub fn new(asset: Asset) -> Self {
-    Editor {
-      asset,
-      new_import: None,
-      selected_import: None,
-      selected_export: None,
-      selected_property: None,
+  pub fn default() -> Self {
+    Self {
+      state: State::None,
+      err: None,
     }
   }
 }
@@ -56,7 +79,7 @@ impl Editor {
 pub fn input_dependency(
   ui: &Ui,
   label: &str,
-  asset: &Asset,
+  header: &AssetHeader,
   dep: Dependency,
 ) -> Option<Dependency> {
   let mut new_dep = dep.clone();
@@ -90,7 +113,7 @@ pub fn input_dependency(
     Dependency::Import(name) => ComboBox::new(im_str!("Import"))
       .preview_value(&ImString::from(name.to_string()))
       .build(&ui, || {
-        for import in asset.list_imports() {
+        for import in header.list_imports() {
           let is_selected = name == import.name;
           if Selectable::new(&ImString::from(import.name.to_string()))
             .selected(is_selected)
@@ -104,7 +127,7 @@ pub fn input_dependency(
     Dependency::Export(name) => ComboBox::new(im_str!("Export"))
       .preview_value(&ImString::from(name.to_string()))
       .build(&ui, || {
-        for export in asset.list_exports() {
+        for export in header.list_exports() {
           let is_selected = name == export;
           if Selectable::new(&ImString::from(export.to_string()))
             .selected(is_selected)

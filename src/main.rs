@@ -48,12 +48,10 @@ fn main() {
         return;
     }
 
-    let asset = if args.len() == 2 {
+    if args.len() == 2 {
         let asset_loc: &Path = args[1].as_ref();
-        let asset = Asset::read_from(asset_loc);
-        Some(asset)
+        start_editor_with_path(asset_loc);
     } else {
-        None
-    };
-    start_editor(asset.map(|x| x.unwrap()));
+        start_editor_empty();
+    }
 }
