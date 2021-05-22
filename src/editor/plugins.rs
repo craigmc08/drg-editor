@@ -9,6 +9,7 @@ use imgui::*;
 pub enum PluginType {
   PluginNone {
     reason: String,
+    original: Property,
   },
   PluginObject {
     dep: Dependency,
@@ -32,10 +33,10 @@ pub enum PluginType {
 }
 
 impl PluginType {
-  fn to_property(&self, original: &Property) -> Property {
-    let name = original.meta.name.clone();
+  fn to_property(&self, name: &NameVariant) -> Property {
+    let name = name.clone();
     match self {
-      Self::PluginNone { .. } => original.clone(),
+      Self::PluginNone { original, .. } => original.clone(),
       Self::PluginObject { dep } => dep.as_property(name),
       Self::PluginArray { sub_editors, .. } => sub_editors.as_property(name),
       Self::PluginBool { value } => value.as_property(name),
@@ -46,8 +47,43 @@ impl PluginType {
   }
 }
 
+impl AsProperty for PluginType {
+  fn prop_type(&self) -> PropType {
+    match self {
+      PluginType::PluginNone { original, .. } => original.meta.typ,
+      PluginType::PluginObject { .. } => PropType::ObjectProperty,
+      PluginType::PluginArray { .. } => PropType::ArrayProperty,
+      PluginType::PluginBool { .. } => PropType::BoolProperty,
+      PluginType::PluginFloat { .. } => PropType::FloatProperty,
+      PluginType::PluginInt { .. } => PropType::IntProperty,
+      PluginType::PluginStr { .. } => PropType::StrProperty,
+    }
+  }
+  fn as_tag(&self) -> Tag {
+    match self {
+      PluginType::PluginNone { original, .. } => original.tag.clone(),
+      PluginType::PluginBool { value } => Tag::Bool(*value),
+      PluginType::PluginArray { value_type, .. } => Tag::Array {
+        inner_type: *value_type,
+      },
+      _ => Tag::Simple(self.prop_type()),
+    }
+  }
+  fn as_value(&self) -> Value {
+    match self {
+      PluginType::PluginNone { original, .. } => original.value.clone(),
+      PluginType::PluginObject { dep } => dep.as_value(),
+      PluginType::PluginArray { sub_editors, .. } => sub_editors.as_value(),
+      PluginType::PluginBool { value } => value.as_value(),
+      PluginType::PluginFloat { value } => value.as_value(),
+      PluginType::PluginInt { value } => value.as_value(),
+      PluginType::PluginStr { value } => value.to_string().as_value(),
+    }
+  }
+}
+
 pub struct EditorPlugin {
-  original: Property,
+  name: NameVariant,
   plugin: PluginType,
 }
 
@@ -91,11 +127,12 @@ impl EditorPlugin {
         PluginType::PluginStr { value: str }
       }
       _ => PluginType::PluginNone {
+        original: property.clone(),
         reason: format!("Unsupported property type {}", property.meta.typ),
       },
     };
     EditorPlugin {
-      original: property.clone(),
+      name: property.meta.name.clone(),
       plugin,
     }
   }
@@ -103,11 +140,8 @@ impl EditorPlugin {
   /// Returns true if a change was made
   pub fn input(&mut self, ui: &Ui, asset: &Asset) -> bool {
     match &mut self.plugin {
-      PluginType::PluginNone { reason } => {
-        ui.text(format!(
-          "Can't edit {}: {}",
-          self.original.meta.name, reason
-        ));
+      PluginType::PluginNone { reason, .. } => {
+        ui.text(format!("Can't edit {}: {}", self.name, reason));
         false
       }
       PluginType::PluginObject { dep } => {
@@ -183,16 +217,8 @@ impl EditorPlugin {
       // TODO ArrayProperty
       // TODO StructProperty
       _ => {
-        return Self {
-          original: Property {
-            meta: Meta::new("", typ, 0),
-            tag: Tag::Simple(typ),
-            value: Value::Bool,
-          },
-          plugin: PluginType::PluginNone {
-            reason: format!("Can't create new {}", typ),
-          },
-        };
+        // TODO better way to handle this error besides panic!ing?
+        panic!("Can't create default property editor for {}", typ)
       }
     };
     Self::new(&Property {
@@ -206,22 +232,22 @@ impl EditorPlugin {
     if let Some(i) = strct
       .properties
       .iter()
-      .position(|prop| prop.meta.name == self.original.meta.name)
+      .position(|prop| prop.meta.name == self.name)
     {
-      strct.properties[i] = self.plugin.to_property(&self.original);
+      strct.properties[i] = self.plugin.to_property(&self.name);
     }
   }
 }
 
 impl AsProperty for EditorPlugin {
   fn prop_type(&self) -> PropType {
-    self.plugin.to_property(&self.original).meta.typ
+    self.plugin.prop_type()
   }
   fn as_tag(&self) -> Tag {
-    self.plugin.to_property(&self.original).tag
+    self.plugin.as_tag()
   }
   fn as_value(&self) -> Value {
-    self.plugin.to_property(&self.original).value
+    self.plugin.as_value()
   }
 }
 impl FromProperty for EditorPlugin {

@@ -20,8 +20,8 @@ pub trait AsProperty {
 
 // Represents a value that can be turned into a property with a simple tag
 pub trait AsSimpleProperty {
-  fn prop_type() -> PropType;
-  fn as_value(&self) -> Value;
+  fn simple_prop_type() -> PropType;
+  fn as_simple_value(&self) -> Value;
 }
 
 impl<T> AsProperty for T
@@ -29,13 +29,13 @@ where
   T: AsSimpleProperty,
 {
   fn prop_type(&self) -> PropType {
-    <Self as AsSimpleProperty>::prop_type()
+    Self::simple_prop_type()
   }
   fn as_tag(&self) -> Tag {
     Tag::Simple(self.prop_type())
   }
   fn as_value(&self) -> Value {
-    <Self as AsSimpleProperty>::as_value(self)
+    self.as_simple_value()
   }
 }
 
@@ -230,10 +230,10 @@ impl FromProperty for bool {
 }
 
 impl AsSimpleProperty for i32 {
-  fn prop_type() -> PropType {
+  fn simple_prop_type() -> PropType {
     PropType::IntProperty
   }
-  fn as_value(&self) -> Value {
+  fn as_simple_value(&self) -> Value {
     Value::Int(*self)
   }
 }
@@ -247,10 +247,10 @@ impl FromValue for i32 {
 }
 
 impl AsSimpleProperty for f32 {
-  fn prop_type() -> PropType {
+  fn simple_prop_type() -> PropType {
     PropType::FloatProperty
   }
-  fn as_value(&self) -> Value {
+  fn as_simple_value(&self) -> Value {
     Value::Float(*self)
   }
 }
@@ -292,10 +292,10 @@ where
 }
 
 impl AsSimpleProperty for Dependency {
-  fn prop_type() -> PropType {
+  fn simple_prop_type() -> PropType {
     PropType::ObjectProperty
   }
-  fn as_value(&self) -> Value {
+  fn as_simple_value(&self) -> Value {
     Value::Object(self.clone())
   }
 }
@@ -309,10 +309,10 @@ impl FromValue for Dependency {
 }
 
 impl AsSimpleProperty for String {
-  fn prop_type() -> PropType {
+  fn simple_prop_type() -> PropType {
     PropType::StrProperty
   }
-  fn as_value(&self) -> Value {
+  fn as_simple_value(&self) -> Value {
     Value::Str(self.clone())
   }
 }
