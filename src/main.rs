@@ -1,13 +1,13 @@
-// #![windows_subsystem = "windows"]
+#![windows_subsystem = "windows"]
 
 mod asset;
 mod bindings;
-// mod editor;
+mod editor;
 mod reader;
 mod util;
 
 use asset::*;
-// use editor::*;
+use editor::*;
 use std::env;
 use std::path::*;
 
@@ -55,5 +55,5 @@ fn main() {
     } else {
         None
     };
-    // start_editor(asset.map(|x| x.unwrap()));
+    start_editor(asset.map(|x| x.unwrap()));
 }

@@ -4,6 +4,7 @@ use crate::asset::property::prop_type::*;
 use crate::asset::*;
 use crate::loader_simple;
 use crate::reader::*;
+use crate::util::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 pub const LOADER_INT: PropertyLoader = loader_simple!(
@@ -35,6 +36,18 @@ pub const LOADER_NAME: PropertyLoader = loader_simple!(
   deserialize_name,
   serialize_name,
   |_, _| 8,
+);
+pub const LOADER_STR: PropertyLoader = loader_simple!(
+  PropType::StrProperty,
+  deserialize_str,
+  serialize_str,
+  |val, _| {
+    if let Value::Str(val) = val {
+      4 + val.len() + 1
+    } else {
+      unreachable!()
+    }
+  }
 );
 
 // TODO: figure out if boiler plate on the numeric types can be reduced further?
@@ -163,5 +176,24 @@ fn serialize_name(
     Ok(())
   } else {
     unreachable!()
+  }
+}
+
+fn deserialize_str(rdr: &mut ByteReader, _: &Tag, _: u64, ctx: PropertyContext) -> Result<Value> {
+  Ok(Value::Str(read_string(rdr)?))
+}
+/// # Panics
+/// If val is not Str variant
+fn serialize_str(
+  val: &Value,
+  _: &Tag,
+  curs: &mut Cursor<Vec<u8>>,
+  ctx: PropertyContext,
+) -> Result<()> {
+  if let Value::Str(val) = val {
+    write_string(curs, val)?;
+    Ok(())
+  } else {
+    unreachable!();
   }
 }

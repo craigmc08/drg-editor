@@ -307,3 +307,20 @@ impl FromValue for Dependency {
     }
   }
 }
+
+impl AsSimpleProperty for String {
+  fn prop_type() -> PropType {
+    PropType::StrProperty
+  }
+  fn as_value(&self) -> Value {
+    Value::Str(self.clone())
+  }
+}
+impl FromValue for String {
+  fn from_value(value: &Value) -> Option<Self> {
+    match &value {
+      Value::Str(value) => Some(value.clone()),
+      _ => None,
+    }
+  }
+}

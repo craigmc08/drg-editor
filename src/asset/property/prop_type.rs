@@ -12,6 +12,7 @@ pub enum PropType {
   ObjectProperty,
   SoftObjectProperty,
   NameProperty,
+  StrProperty,
 
   BoolProperty,
   ByteProperty,
