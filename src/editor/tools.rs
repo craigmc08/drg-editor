@@ -94,7 +94,11 @@ impl Tool for NameReplacerTool {
     ui.input_text(im_str!("Replace With"), &mut self.to).build();
   }
   fn finish(&self, state: &mut State) {
-    println!("TODO actually replace name :)");
+    if state.has_header() {
+      let header = state.header_mut();
+      let from = NameVariant::parse(&self.from, &header.names);
+      header.names.names[from.name_idx].name = self.to.to_string();
+    }
   }
 }
 

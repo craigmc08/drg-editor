@@ -36,8 +36,8 @@ impl Name {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct NameVariant {
-  name_idx: usize, // Reference into Names
-  variant: u32,
+  pub name_idx: usize, // Reference into Names
+  pub variant: u32,
 }
 
 impl NameVariant {
