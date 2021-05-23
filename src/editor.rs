@@ -126,95 +126,84 @@ fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mu
 }
 
 fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mut Editor) {
-  let w = Window::new(im_str!("Menu"))
-    .title_bar(false)
-    .resizable(false)
-    .collapsible(false)
-    .movable(false)
-    .scroll_bar(false)
-    .position(pos, Condition::Always)
-    .size(size, Condition::Always);
-  w.build(&ui, || {
-    if ui.button(im_str!("Open"), [0.0, 0.0]) {
-      if let Some(fp) = open_file_dialog(
-        "Open Asset",
-        "",
-        Some((&["*.uasset"], "DRG Asset file (*.uasset)")),
-      ) {
-        match AssetHeader::read_from(fp.as_ref()) {
-          Err(err) => {
-            editor.err = Some(err);
-            ui.open_popup(im_str!("Error"));
-          }
-          Ok(header) => {
-            editor.state = State::Header {
-              header,
-              path: Box::from(fp.as_ref()),
-              import_editor: ImportEditor::default(),
-            }
-          }
-        }
-      }
-    }
-
-    ui.same_line(0.0);
-    match &mut editor.state {
-      // No save button for None file
-      State::None => {}
-      State::Header { header, .. } => {
-        if ui.button(im_str!("Save As"), [0.0, 0.0]) {
-          if let Some(fp) = save_file_dialog_with_filter(
-            "Save Asset",
-            "",
-            &["*.uasset"],
-            "DRG Asset file (*.uasset)",
-          ) {
-            header.recalculate_offsets();
-            if let Err(err) = header.write_out(fp.as_ref()) {
+  if let Some(main_menu_bar) = ui.begin_main_menu_bar() {
+    if let Some(file_menu) = ui.begin_menu(im_str!("File"), true) {
+      // FILE > OPEN
+      if MenuItem::new(im_str!("Open")).build(ui) {
+        if let Some(fp) = open_file_dialog(
+          "Open Asset",
+          "",
+          Some((&["*.uasset"], "DRG Asset file (*.uasset)")),
+        ) {
+          match AssetHeader::read_from(fp.as_ref()) {
+            Err(err) => {
               editor.err = Some(err);
               ui.open_popup(im_str!("Error"));
             }
-          }
-        }
-        ui.same_line(0.0);
-      }
-      State::Asset { asset, .. } => {
-        if ui.button(im_str!("Save As"), [0.0, 0.0]) {
-          if let Some(fp) = save_file_dialog_with_filter(
-            "Save Asset",
-            "",
-            &[".uasset"],
-            "DRG Asset file (*.uasset)",
-          ) {
-            asset.recalculate_offsets();
-            if let Err(err) = asset.write_out(fp.as_ref()) {
-              editor.err = Some(err);
-              ui.open_popup(im_str!("Error"));
+            Ok(header) => {
+              editor.state = State::Header {
+                header,
+                path: Box::from(fp.as_ref()),
+                import_editor: ImportEditor::default(),
+              }
             }
           }
         }
-        ui.same_line(0.0);
       }
+
+      // FILE > SAVE
+      if MenuItem::new(im_str!("Save As"))
+        .enabled(editor.state.has_header())
+        .build(ui)
+      {
+        if let Some(fp) =
+          save_file_dialog_with_filter("Save Asset", "", &["*.uasset"], "DRG Asset file (*.uasset)")
+        {
+          match &mut editor.state {
+            State::None => {
+              // Unreachable, disabled for None
+            }
+            State::Header { header, .. } => {
+              header.recalculate_offsets();
+              if let Err(err) = header.write_out(fp.as_ref()) {
+                editor.err = Some(err);
+                ui.open_popup(im_str!("Error"));
+              }
+            }
+            State::Asset { asset, .. } => {
+              asset.recalculate_offsets();
+              if let Err(err) = asset.write_out(fp.as_ref()) {
+                editor.err = Some(err);
+                ui.open_popup(im_str!("Error"));
+              }
+            }
+          }
+        }
+      }
+
+      if MenuItem::new(im_str!("Exit")).build(ui) {
+        *run = false;
+      }
+
+      file_menu.end(ui);
     }
 
-    ui.popup_modal(im_str!("Error")).build(|| {
-      if let Some(err) = &editor.err {
-        ui.text(format!("{}", err));
-        ui.text("Caused by:");
-        err.chain().skip(1).enumerate().for_each(|(i, cause)| {
-          ui.text(format!("    {}: {}", i, cause));
-        });
-        ui.spacing();
-        if ui.button(im_str!("Ok"), [0.0, 0.0]) {
-          ui.close_current_popup();
-        }
-      } else {
+    main_menu_bar.end(ui);
+  }
+
+  ui.popup_modal(im_str!("Error")).build(|| {
+    if let Some(err) = &editor.err {
+      ui.text(format!("{}", err));
+      ui.text("Caused by:");
+      err.chain().skip(1).enumerate().for_each(|(i, cause)| {
+        ui.text(format!("    {}: {}", i, cause));
+      });
+      ui.spacing();
+      if ui.button(im_str!("Ok"), [0.0, 0.0]) {
         ui.close_current_popup();
       }
-    });
-
-    if ui.button(im_str!("Quit"), [0.0, 0.0]) {
-      *run = false;
+    } else {
+      ui.close_current_popup();
     }
   });
 }
