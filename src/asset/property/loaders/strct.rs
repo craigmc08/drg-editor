@@ -71,7 +71,7 @@ fn deserialize_struct(
   } else {
     rdr.seek(SeekFrom::Start(start_pos))?;
     let mut none: Cursor<Vec<u8>> = Cursor::new(vec![]);
-    let none_name: NameVariant = "None".into();
+    let none_name: NameVariant = NameVariant::new("None", 0, ctx.names);
     none_name
       .write(&mut none, ctx.names)
       .with_context(|| "Expected None in names")?;
@@ -104,12 +104,16 @@ fn serialize_struct(
   match val {
     Value::Struct { properties } => {
       for (i, property) in properties.iter().enumerate() {
-        property
-          .serialize(curs, ctx)
-          .with_context(|| format!("Struct[{}] or Struct['{}']", i, property.meta.name))?;
+        property.serialize(curs, ctx).with_context(|| {
+          format!(
+            "Struct[{}] or Struct['{}']",
+            i,
+            property.meta.name.to_string(ctx.names)
+          )
+        })?;
       }
       // Write None property
-      let none: NameVariant = "None".into();
+      let none: NameVariant = NameVariant::new("None", 0, ctx.names);
       none
         .write(curs, ctx.names)
         .with_context(|| "Expected None in names")?;

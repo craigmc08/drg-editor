@@ -13,11 +13,11 @@ pub enum Dependency {
 }
 
 impl Dependency {
-  pub fn import<T: Into<NameVariant>>(name: T) -> Self {
-    Self::Import(name.into())
+  pub fn import(name: NameVariant) -> Self {
+    Self::Import(name)
   }
-  pub fn export<T: Into<NameVariant>>(name: T) -> Self {
-    Self::Export(name.into())
+  pub fn export(name: NameVariant) -> Self {
+    Self::Export(name)
   }
   pub fn uobject() -> Self {
     Self::UObject
@@ -59,6 +59,7 @@ impl Dependency {
   pub fn write(
     &self,
     curs: &mut Cursor<Vec<u8>>,
+    names: &NameMap,
     imports: &ObjectImports,
     exports: &ObjectExports,
   ) -> Result<()> {
@@ -66,22 +67,20 @@ impl Dependency {
       Self::UObject => 0,
       Self::Import(name) => imports
         .serialized_index_of(name)
-        .with_context(|| format!("Name {} is not imported", name))?,
+        .with_context(|| format!("Name {} is not imported", name.to_string(names)))?,
       Self::Export(name) => exports
         .serialized_index_of(name)
-        .with_context(|| format!("Name {} is not exported", name))?,
+        .with_context(|| format!("Name {} is not exported", name.to_string(names)))?,
     };
     write_u32(curs, dep_i)?;
     Ok(())
   }
-}
 
-impl std::fmt::Display for Dependency {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  pub fn to_string(&self, names: &NameMap) -> String {
     match self {
-      Self::UObject => write!(f, "UObject"),
-      Self::Import(name) => write!(f, "Import {}", name),
-      Self::Export(name) => write!(f, "Export {}", name),
+      Self::UObject => format!("UObject"),
+      Self::Import(name) => format!("Import {}", name.to_string(names)),
+      Self::Export(name) => format!("Export {}", name.to_string(names)),
     }
   }
 }
@@ -123,11 +122,12 @@ impl PreloadDependencies {
   pub fn write(
     &self,
     curs: &mut Cursor<Vec<u8>>,
+    names: &NameMap,
     imports: &ObjectImports,
     exports: &ObjectExports,
   ) -> Result<()> {
     for dep in self.dependencies.iter() {
-      dep.write(curs, imports, exports)?;
+      dep.write(curs, names, imports, exports)?;
     }
     Ok(())
   }
@@ -138,10 +138,14 @@ impl PreloadDependencies {
   }
 
   // TODO check for duplicates
-  pub fn add_import(&mut self, name: &str) -> () {
-    self.dependencies.push(Dependency::import(name));
+  pub fn add_import(&mut self, names: &NameMap, name: &str) -> () {
+    self
+      .dependencies
+      .push(Dependency::import(NameVariant::parse(name, names)));
   }
-  pub fn add_export(&mut self, name: &str) -> () {
-    self.dependencies.push(Dependency::export(name));
+  pub fn add_export(&mut self, names: &NameMap, name: &str) -> () {
+    self
+      .dependencies
+      .push(Dependency::export(NameVariant::parse(name, names)));
   }
 }

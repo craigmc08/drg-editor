@@ -8,7 +8,7 @@ pub trait AsProperty {
   fn as_tag(&self) -> Tag;
   fn as_value(&self) -> Value;
 
-  fn as_property<T: Into<NameVariant>>(&self, name: T) -> Property {
+  fn as_property(&self, name: NameVariant) -> Property {
     Property {
       // Size doesn't matter
       meta: Meta::new(name, self.prop_type(), 0),
@@ -74,9 +74,9 @@ impl Property {
 
 impl Properties {
   /// Get the value of a property by name
-  pub fn get<T: FromProperty>(&self, name: &str) -> Option<T> {
+  pub fn get<T: FromProperty>(&self, name: &str, names: &NameMap) -> Option<T> {
     for prop in self.properties.iter() {
-      if prop.meta.name == NameVariant::parse(name) {
+      if prop.meta.name == NameVariant::parse(name, names) {
         return T::from_property(prop);
       }
     }
@@ -84,8 +84,8 @@ impl Properties {
   }
 
   /// Set the value of a property by name
-  pub fn set<T: AsProperty>(&mut self, name: &str, value: T) -> () {
-    let name = NameVariant::parse(name);
+  pub fn set<T: AsProperty>(&mut self, name: &str, value: T, names: &NameMap) -> () {
+    let name = NameVariant::parse(name, names);
     let new_prop = value.as_property(name.clone());
     match self
       .properties
@@ -119,14 +119,10 @@ impl AssetHeader {
   /// asset.import("/Script/FSD", "ItemID", "ID_GrapplingGun", Dependency::Import("/Game/WeaponsNTools/GrapplingGun/ID_Grappling");
   /// ```
   pub fn import(&mut self, class_package: &str, class: &str, name: &str, outer: Dependency) -> () {
-    let class_package = NameVariant::parse(class_package);
-    let class = NameVariant::parse(class);
-    let name = NameVariant::parse(name);
-
-    // Ensure the base names are imported
-    self.names.add(&class_package.name);
-    self.names.add(&class.name);
-    self.names.add(&name.name);
+    // Make sure all names are in the names list
+    let class_package = NameVariant::parse_and_add(class_package, &mut self.names);
+    let class = NameVariant::parse_and_add(class, &mut self.names);
+    let name = NameVariant::parse_and_add(name, &mut self.names);
 
     match self
       .imports
@@ -190,7 +186,7 @@ impl Asset {
   ///
   /// To borrow the Struct as mutable, see [Self::get_struct_mut]
   pub fn get_struct(&self, name: &str) -> Option<&Properties> {
-    let name = NameVariant::parse(name);
+    let name = NameVariant::parse(name, self.names());
     match self
       .exports()
       .exports
@@ -204,7 +200,7 @@ impl Asset {
 
   /// Attempt to borrow as mutable an exported Struct by name.
   pub fn get_struct_mut(&mut self, name: &str) -> Option<&mut Properties> {
-    let name = NameVariant::parse(name);
+    let name = NameVariant::parse(name, self.names());
     match self
       .exports()
       .exports

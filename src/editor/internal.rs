@@ -137,9 +137,9 @@ pub fn input_dependency(
   let mut new_dep = dep.clone();
 
   let (prev_item, prev_name) = match dep {
-    Dependency::UObject => (0, "".to_string()),
-    Dependency::Import(name) => (1, name.to_string()),
-    Dependency::Export(name) => (2, name.to_string()),
+    Dependency::UObject => (0, None),
+    Dependency::Import(name) => (1, Some(name)),
+    Dependency::Export(name) => (2, Some(name)),
   };
 
   let mut current_item = prev_item;
@@ -154,8 +154,8 @@ pub fn input_dependency(
     changed = true;
     new_dep = match current_item {
       0 => Dependency::uobject(),
-      1 => Dependency::import(prev_name),
-      2 => Dependency::export(prev_name),
+      1 => Dependency::import(prev_name.unwrap_or(header.list_imports()[0].name.clone())),
+      2 => Dependency::export(prev_name.unwrap_or(header.list_exports()[0].clone())),
       _ => unreachable!(),
     }
   }
@@ -163,11 +163,11 @@ pub fn input_dependency(
   match new_dep.clone() {
     Dependency::UObject => {}
     Dependency::Import(name) => ComboBox::new(im_str!("Import"))
-      .preview_value(&ImString::from(name.to_string()))
+      .preview_value(&ImString::from(name.to_string(&header.names)))
       .build(&ui, || {
         for import in header.list_imports() {
           let is_selected = name == import.name;
-          if Selectable::new(&ImString::from(import.name.to_string()))
+          if Selectable::new(&ImString::from(import.name.to_string(&header.names)))
             .selected(is_selected)
             .build(&ui)
           {
@@ -177,11 +177,11 @@ pub fn input_dependency(
         }
       }),
     Dependency::Export(name) => ComboBox::new(im_str!("Export"))
-      .preview_value(&ImString::from(name.to_string()))
+      .preview_value(&ImString::from(name.to_string(&header.names)))
       .build(&ui, || {
         for export in header.list_exports() {
           let is_selected = name == export;
-          if Selectable::new(&ImString::from(export.to_string()))
+          if Selectable::new(&ImString::from(export.to_string(&header.names)))
             .selected(is_selected)
             .build(&ui)
           {

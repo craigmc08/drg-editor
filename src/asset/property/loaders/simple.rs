@@ -121,7 +121,7 @@ fn serialize_object(
   ctx: PropertyContext,
 ) -> Result<()> {
   if let Value::Object(dep) = val {
-    dep.write(curs, ctx.imports, ctx.exports)?;
+    dep.write(curs, ctx.names, ctx.imports, ctx.exports)?;
     Ok(())
   } else {
     unreachable!()
