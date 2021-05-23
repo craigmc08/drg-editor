@@ -141,7 +141,11 @@ impl EditorPlugin {
   pub fn input(&mut self, ui: &Ui, asset: &Asset) -> bool {
     match &mut self.plugin {
       PluginType::PluginNone { reason, .. } => {
-        ui.text(format!("Can't edit {}: {}", self.name, reason));
+        ui.text(format!(
+          "Can't edit {}: {}",
+          self.name.to_string(&asset.header.names),
+          reason
+        ));
         false
       }
       PluginType::PluginObject { dep } => {
@@ -183,7 +187,7 @@ impl EditorPlugin {
         // Add button
         if ui.button(im_str!("Add Element"), [0.0, 0.0]) {
           changed = true;
-          let sub_editor = EditorPlugin::default_from_type(*value_type);
+          let sub_editor = EditorPlugin::default_from_type(*value_type, &asset.header);
           sub_editors.push(sub_editor);
         }
 
@@ -207,7 +211,7 @@ impl EditorPlugin {
     }
   }
 
-  pub fn default_from_type(typ: PropType) -> Self {
+  pub fn default_from_type(typ: PropType, header: &AssetHeader) -> Self {
     let (tag, value) = match typ {
       PropType::ObjectProperty => (Tag::Simple(typ), Value::Object(Dependency::uobject())),
       PropType::BoolProperty => (Tag::Bool(false), Value::Bool),
@@ -222,7 +226,7 @@ impl EditorPlugin {
       }
     };
     Self::new(&Property {
-      meta: Meta::new("", typ, 0),
+      meta: Meta::new(NameVariant::new("", 0, &header.names), typ, 0),
       tag,
       value,
     })

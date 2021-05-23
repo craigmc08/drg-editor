@@ -105,7 +105,7 @@ impl AssetHeader {
       .with_context(|| "Failed to write dependencies or asset registry")?;
     self
       .dependencies
-      .write(&mut cursor, &self.imports, &self.exports)
+      .write(&mut cursor, &self.names, &self.imports, &self.exports)
       .with_context(|| "Failed to write preload dependencies")?;
 
     Ok(cursor.into_inner())
@@ -192,7 +192,9 @@ impl AssetExports {
       strct.serialize(&mut cursor, ctx).with_context(|| {
         format!(
           "Failed to write struct {}",
-          header.exports.exports[i].object_name
+          header.exports.exports[i]
+            .object_name
+            .to_string(&header.names)
         )
       })?;
     }

@@ -12,7 +12,7 @@ pub struct Meta {
 }
 
 impl Meta {
-  pub fn new(name: impl Into<NameVariant>, typ: PropType, size: u64) -> Self {
+  pub fn new(name: NameVariant, typ: PropType, size: u64) -> Self {
     Self {
       name: name.into(),
       typ,
@@ -22,7 +22,7 @@ impl Meta {
 
   pub fn deserialize(rdr: &mut ByteReader, ctx: PropertyContext) -> Result<Option<Self>> {
     let name = NameVariant::read(rdr, ctx.names)?;
-    if name.to_string() == "None" {
+    if name.to_string(ctx.names) == "None" {
       return Ok(None);
     }
 

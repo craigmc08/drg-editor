@@ -132,7 +132,7 @@ impl Properties {
     if start_pos != export.export_file_offset {
       bail!(
         "Wrong properties starting position for {}: Expected to be at position {:#X}, but I'm at position {:#X}",
-        export.object_name, export.export_file_offset, start_pos
+        export.object_name.to_string(ctx.names), export.export_file_offset, start_pos
       );
     }
     let mut ends_with_none = false;
@@ -146,7 +146,8 @@ impl Properties {
       if let Some(prop) = Property::deserialize(rdr, ctx).with_context(|| {
         format!(
           "Property in {} starting at {:#X}",
-          export.object_name, start_pos
+          export.object_name.to_string(ctx.names),
+          start_pos
         )
       })? {
         properties.push(prop);
@@ -161,7 +162,7 @@ impl Properties {
     if num_bytes_read > export.serial_size {
       bail!(
         "Properties length for {} too long: Expected to read at most {:#X} bytes, but I read {:#X}",
-        export.object_name,
+        export.object_name.to_string(ctx.names),
         export.serial_size,
         num_bytes_read
       );
@@ -195,7 +196,7 @@ impl Properties {
     }
 
     if self.ends_with_none {
-      let none: NameVariant = "None".into();
+      let none: NameVariant = NameVariant::new("None", 0, ctx.names);
       none
         .write(curs, ctx.names)
         .with_context(|| "Expected None in names")?;

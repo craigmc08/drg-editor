@@ -257,7 +257,10 @@ fn draw_imports_editor(
       for import in header.list_imports() {
         let active = Some(import.name.clone()) == editor.selected_import;
 
-        if ui.radio_button_bool(&ImString::from(import.name.to_string()), active) {
+        if ui.radio_button_bool(
+          &ImString::from(import.name.to_string(&header.names)),
+          active,
+        ) {
           editor.selected_import = Some(import.name.clone());
         }
       }
@@ -286,10 +289,13 @@ fn draw_imports_editor(
         let outer = Dependency::deserialize(import.outer_index, &header.imports, &header.exports)
           .expect("Invalid Import outer");
 
-        ui.text(format!("Class Package: {}", import.class_package));
-        ui.text(format!("Class: {}", import.class));
-        ui.text(format!("Name: {}", import.name));
-        ui.text(format!("Outer: {}", outer));
+        ui.text(format!(
+          "Class Package: {}",
+          import.class_package.to_string(&header.names)
+        ));
+        ui.text(format!("Class: {}", import.class.to_string(&header.names)));
+        ui.text(format!("Name: {}", import.name.to_string(&header.names)));
+        ui.text(format!("Outer: {}", outer.to_string(&header.names)));
       } else {
         ui.text("Select an import");
       }
@@ -390,7 +396,7 @@ fn draw_exports_selector(
     for export in asset.list_exports() {
       let active = Some(export.clone()) == editor.selected_export;
 
-      if ui.radio_button_bool(&ImString::from(export.to_string()), active) {
+      if ui.radio_button_bool(&ImString::from(export.to_string(asset.names())), active) {
         if !active {
           // The selected export is changing, so have to deselect the property
           editor.selected_export = Some(export.clone());
@@ -422,11 +428,15 @@ fn draw_property_selector(
         .iter()
         .position(|x| x == selected)
         .expect("Invalid selected export. Report this crash to the maintainer.");
-      let strct = &asset.structs_mut()[idx];
+      let strct = &asset.exports.structs[idx];
       for prop in &strct.properties {
         let active =
           Some(prop.meta.name.clone()) == editor.selected_property.as_ref().map(|s| s.name.clone());
-        if ui.radio_button_bool(&ImString::from(prop.meta.name.to_string()), active) && !active {
+        if ui.radio_button_bool(
+          &ImString::from(prop.meta.name.to_string(asset.names())),
+          active,
+        ) && !active
+        {
           editor.selected_property = Some(SelectedProperty {
             name: prop.meta.name.clone(),
             dirty: false,
@@ -458,9 +468,12 @@ fn draw_property_editor(
   w.build(&ui, || {
     if let Some(selected) = &mut editor.selected_property {
       if selected.dirty {
-        ui.text(ImString::from(format!("*{}", selected.name)));
+        ui.text(ImString::from(format!(
+          "*{}",
+          selected.name.to_string(asset.names())
+        )));
       } else {
-        ui.text(ImString::from(selected.name.to_string()));
+        ui.text(ImString::from(selected.name.to_string(asset.names())));
       }
       ui.same_line(0.0);
       if ui.button(im_str!("Save"), [0.0, 0.0]) {
