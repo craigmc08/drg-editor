@@ -3,18 +3,23 @@ use crate::asset::*;
 mod internal;
 mod plugins;
 mod support;
+mod tools;
 
 use imgui::*;
 use internal::*;
 use plugins::*;
 use std::path::Path;
 use tinyfiledialogs::{open_file_dialog, save_file_dialog_with_filter};
+use tools::*;
+
+const MAIN_WINDOW_FLAGS: WindowFlags = WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS;
 
 pub fn start_editor_with_path(fp: &Path) {
   let editor = match AssetHeader::read_from(fp) {
     Err(err) => Editor {
       state: State::None,
       err: Some(err),
+      tool: None,
     },
     Ok(header) => Editor {
       state: State::Header {
@@ -23,6 +28,7 @@ pub fn start_editor_with_path(fp: &Path) {
         import_editor: ImportEditor::default(),
       },
       err: None,
+      tool: None,
     },
   };
   init_editor(editor)
@@ -51,6 +57,14 @@ fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mu
   let (width, height) = (width, height - menu_height);
 
   draw_menu([0.0, 0.0], [width, menu_height], run, ui, editor);
+
+  if let Some(tool_editor) = &mut editor.tool {
+    let mut done = false;
+    tool_editor.draw(&mut editor.state, ui, &mut done);
+    if done {
+      editor.tool = None;
+    }
+  }
 
   match &mut editor.state {
     State::None => {
@@ -188,6 +202,14 @@ fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mu
       file_menu.end(ui);
     }
 
+    if let Some(edit_menu) = ui.begin_menu(im_str!("Edit"), true) {
+      if let Some(tool_editor) = ToolEditor::menu_items(&editor.state, ui) {
+        editor.tool = Some(tool_editor);
+      }
+
+      edit_menu.end(ui);
+    }
+
     main_menu_bar.end(ui);
   }
 
@@ -216,6 +238,7 @@ fn draw_imports_editor(
   editor: &mut ImportEditor,
 ) {
   let w = Window::new(im_str!("Imports"))
+    .flags(MAIN_WINDOW_FLAGS)
     .resizable(false)
     .collapsible(false)
     .movable(false)
@@ -310,6 +333,7 @@ fn draw_exports_loader(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edit
   } = std::mem::take(&mut editor.state)
   {
     let w = Window::new(im_str!("Exports"))
+      .flags(MAIN_WINDOW_FLAGS)
       .resizable(false)
       .collapsible(false)
       .movable(false)
@@ -356,6 +380,7 @@ fn draw_exports_selector(
   editor: &mut ExportEditor,
 ) {
   let w = Window::new(im_str!("Exports"))
+    .flags(MAIN_WINDOW_FLAGS)
     .resizable(false)
     .collapsible(false)
     .movable(false)
@@ -384,6 +409,7 @@ fn draw_property_selector(
   editor: &mut ExportEditor,
 ) {
   let w = Window::new(im_str!("Properties"))
+    .flags(MAIN_WINDOW_FLAGS)
     .resizable(false)
     .collapsible(false)
     .movable(false)
@@ -423,6 +449,7 @@ fn draw_property_editor(
   editor: &mut ExportEditor,
 ) {
   let w = Window::new(im_str!("Property Editor"))
+    .flags(MAIN_WINDOW_FLAGS)
     .resizable(false)
     .collapsible(false)
     .movable(false)

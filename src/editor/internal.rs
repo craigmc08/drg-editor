@@ -1,5 +1,6 @@
 use crate::asset::*;
 use crate::editor::plugins::*;
+use crate::editor::tools::*;
 use imgui::*;
 use std::path::Path;
 
@@ -119,18 +120,11 @@ impl Default for State {
   }
 }
 
+#[derive(Default)]
 pub struct Editor {
   pub state: State,
   pub err: Option<anyhow::Error>,
-}
-
-impl Editor {
-  pub fn default() -> Self {
-    Self {
-      state: State::None,
-      err: None,
-    }
-  }
+  pub tool: Option<ToolEditor>,
 }
 
 /// Returns some value if the Dependency is changed
