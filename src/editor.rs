@@ -152,7 +152,7 @@ fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mu
           match AssetHeader::read_from(fp.as_ref()) {
             Err(err) => {
               editor.err = Some(err);
-              ui.open_popup(im_str!("Error"));
+              ui.open_popup(im_str!("MenuError"));
             }
             Ok(header) => {
               editor.state = State::Header {
@@ -181,14 +181,14 @@ fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mu
               header.recalculate_offsets();
               if let Err(err) = header.write_out(fp.as_ref()) {
                 editor.err = Some(err);
-                ui.open_popup(im_str!("Error"));
+                ui.open_popup(im_str!("MenuError"));
               }
             }
             State::Asset { asset, .. } => {
               asset.recalculate_offsets();
               if let Err(err) = asset.write_out(fp.as_ref()) {
                 editor.err = Some(err);
-                ui.open_popup(im_str!("Error"));
+                ui.open_popup(im_str!("MenuError"));
               }
             }
           }
@@ -210,24 +210,24 @@ fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mu
       edit_menu.end(ui);
     }
 
-    main_menu_bar.end(ui);
-  }
-
-  ui.popup_modal(im_str!("Error")).build(|| {
-    if let Some(err) = &editor.err {
-      ui.text(format!("{}", err));
-      ui.text("Caused by:");
-      err.chain().skip(1).enumerate().for_each(|(i, cause)| {
-        ui.text(format!("    {}: {}", i, cause));
-      });
-      ui.spacing();
-      if ui.button(im_str!("Ok"), [0.0, 0.0]) {
+    ui.popup_modal(im_str!("MenuError")).build(|| {
+      if let Some(err) = &editor.err {
+        ui.text(format!("{}", err));
+        ui.text("Caused by:");
+        err.chain().skip(1).enumerate().for_each(|(i, cause)| {
+          ui.text(format!("    {}: {}", i, cause));
+        });
+        ui.spacing();
+        if ui.button(im_str!("Ok"), [0.0, 0.0]) {
+          ui.close_current_popup();
+        }
+      } else {
         ui.close_current_popup();
       }
-    } else {
-      ui.close_current_popup();
-    }
-  });
+    });
+
+    main_menu_bar.end(ui);
+  }
 }
 
 fn draw_imports_editor(
@@ -354,7 +354,8 @@ fn draw_exports_loader(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edit
               header,
               path,
               import_editor,
-            }
+            };
+            ui.open_popup(im_str!("Error"));
           }
           Ok(uexp) => {
             editor.state = State::Asset {
@@ -372,6 +373,22 @@ fn draw_exports_loader(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edit
           import_editor,
         }
       }
+
+      ui.popup_modal(im_str!("Error")).build(|| {
+        if let Some(err) = &editor.err {
+          ui.text(format!("{}", err));
+          ui.text("Caused by:");
+          err.chain().skip(1).enumerate().for_each(|(i, cause)| {
+            ui.text(format!("    {}: {}", i, cause));
+          });
+          ui.spacing();
+          if ui.button(im_str!("Ok"), [0.0, 0.0]) {
+            ui.close_current_popup();
+          }
+        } else {
+          ui.close_current_popup();
+        }
+      });
     });
   } else {
     unreachable!();
