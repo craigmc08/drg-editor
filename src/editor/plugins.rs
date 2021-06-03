@@ -122,8 +122,7 @@ impl EditorPlugin {
       Value::Float(value) => PluginType::PluginFloat { value: *value },
       Value::Int(value) => PluginType::PluginInt { value: *value },
       Value::Str(value) => {
-        let mut str = ImString::from(value.clone());
-        str.reserve(64);
+        let str = ImString::from(value.clone());
         PluginType::PluginStr { value: str }
       }
       _ => PluginType::PluginNone {
@@ -207,7 +206,10 @@ impl EditorPlugin {
         ui.input_int(im_str!("Int"), value).build();
         prev != *value
       }
-      PluginType::PluginStr { value } => ui.input_text(im_str!("String"), value).build(),
+      PluginType::PluginStr { value } => ui
+        .input_text(im_str!("String"), value)
+        .resize_buffer(true)
+        .build(),
     }
   }
 

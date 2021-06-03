@@ -14,9 +14,9 @@ pub struct EditableImport {
 impl Default for EditableImport {
   fn default() -> Self {
     EditableImport {
-      class_package: ImString::with_capacity(64),
-      class: ImString::with_capacity(64),
-      name: ImString::with_capacity(64),
+      class_package: ImString::with_capacity(8),
+      class: ImString::with_capacity(8),
+      name: ImString::with_capacity(8),
       outer: Dependency::uobject(),
     }
   }

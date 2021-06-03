@@ -91,7 +91,9 @@ impl Tool for NameReplacerTool {
           }
         }
       });
-    ui.input_text(im_str!("Replace With"), &mut self.to).build();
+    ui.input_text(im_str!("Replace With"), &mut self.to)
+      .resize_buffer(true)
+      .build();
   }
   fn finish(&self, state: &mut State) {
     if state.has_header() {
@@ -106,7 +108,7 @@ impl Default for NameReplacerTool {
   fn default() -> Self {
     NameReplacerTool {
       from: "".to_string(),
-      to: ImString::with_capacity(64),
+      to: ImString::with_capacity(8),
     }
   }
 }

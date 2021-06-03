@@ -511,9 +511,14 @@ fn draw_property_editor(
 
 fn input_import(ui: &Ui, header: &AssetHeader, import: &mut EditableImport) {
   ui.input_text(im_str!("Class Package"), &mut import.class_package)
+    .resize_buffer(true)
     .build();
-  ui.input_text(im_str!("Class"), &mut import.class).build();
-  ui.input_text(im_str!("Name"), &mut import.name).build();
+  ui.input_text(im_str!("Class"), &mut import.class)
+    .resize_buffer(true)
+    .build();
+  ui.input_text(im_str!("Name"), &mut import.name)
+    .resize_buffer(true)
+    .build();
   if let Some(new_dep) = input_dependency(ui, "Outer", header, import.outer.clone()) {
     import.outer = new_dep;
   }
