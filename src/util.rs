@@ -27,12 +27,20 @@ pub fn read_u32<R: Read>(rdr: &mut R) -> Result<u32> {
   Ok(rdr.read_u32::<LittleEndian>()?)
 }
 
+pub fn read_byte_string<R: Read>(rdr: &mut R) -> Result<Vec<u8>> {
+  let length = read_u32(rdr)? as usize;
+  if length == 0 {
+    bail!("Cannot read byte string with length 0 (figure out how to?)")
+  } else {
+    let chars = read_bytes(rdr, length - 1)?;
+    rdr.read_exact(&mut [0])?; // Skip past 0 terminator
+    Ok(chars)
+  }
+}
+
 /// Reads a length-prefixed, null-terminated string
 pub fn read_string<R: Read>(rdr: &mut R) -> Result<String> {
-  let length = read_u32(rdr)? as usize;
-  let chars = read_bytes(rdr, length - 1)?;
-  rdr.read_exact(&mut [0])?;
-  Ok(String::from_utf8(chars)?)
+  read_byte_string(rdr).and_then(|bytes| Ok(String::from_utf8(bytes)?))
 }
 
 pub fn read_bool<R: Read>(rdr: &mut R) -> Result<bool> {
@@ -58,12 +66,17 @@ pub fn write_u32<W: Write>(curs: &mut W, val: u32) -> Result<()> {
   Ok(())
 }
 
-pub fn write_string<W: Write>(curs: &mut W, string: &str) -> Result<()> {
-  let length = string.len() + 1;
+pub fn write_byte_string<W: Write, B: AsRef<[u8]>>(curs: &mut W, bytes: B) -> Result<()> {
+  let bytes = bytes.as_ref();
+  let length = bytes.len() + 1;
   write_u32(curs, length as u32)?;
-  curs.write(string.as_bytes())?;
+  curs.write(bytes)?;
   curs.write(&[0])?;
   Ok(())
+}
+
+pub fn write_string<W: Write>(curs: &mut W, string: &str) -> Result<()> {
+  write_byte_string(curs, string.as_bytes())
 }
 
 pub fn write_bool<W: Write>(curs: &mut W, val: bool) -> Result<()> {

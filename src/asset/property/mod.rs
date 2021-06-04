@@ -25,15 +25,29 @@ pub enum Value {
   Object(Dependency),
   // TODO: unk1 might be the length of a string that is stored in the SoftObjectProperty
   // Find example of this happening?
-  SoftObject { object_name: NameVariant, unk1: u32 },
+  SoftObject {
+    object_name: NameVariant,
+    unk1: u32,
+  },
   Name(NameVariant),
   Str(String),
+  Text {
+    header: [u8; 9],
+    bytes: Vec<u8>,
+    text: String,
+  },
 
   Bool,
   Enum(NameVariant), // For ByteProperty and EnumProperty, TODO better name?
-  Array { values: Vec<Value> },
-  Struct { properties: Vec<Property> },
-  RawData { data: Vec<u8> },
+  Array {
+    values: Vec<Value>,
+  },
+  Struct {
+    properties: Vec<Property>,
+  },
+  RawData {
+    data: Vec<u8>,
+  },
   // etc.
 }
 

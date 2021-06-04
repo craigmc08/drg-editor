@@ -49,6 +49,12 @@ pub const LOADER_STR: PropertyLoader = loader_simple!(
     }
   }
 );
+pub const LOADER_TEXT: PropertyLoader = loader_simple!(
+  PropType::TextProperty,
+  deserialize_text,
+  serialize_text,
+  size_of_text,
+);
 
 // TODO: figure out if boiler plate on the numeric types can be reduced further?
 
@@ -195,5 +201,51 @@ fn serialize_str(
     Ok(())
   } else {
     unreachable!();
+  }
+}
+
+/// TextProperty contains 3 sections:
+/// - A 9 byte header: I'm not sure what this represents.
+/// - An array of n bytes, 0 terminated, preceeded by length. Not sure what it represents.
+/// - A string
+fn deserialize_text(rdr: &mut ByteReader, _: &Tag, u: u64, ctx: PropertyContext) -> Result<Value> {
+  let header = read_bytes(rdr, 9)?;
+  let bytes = read_byte_string(rdr)?;
+  let text = read_string(rdr)?;
+  Ok(Value::Text {
+    header,
+    bytes,
+    text,
+  })
+}
+/// # Panics
+/// Panics if Value is not Text variant
+fn serialize_text(
+  val: &Value,
+  _: &Tag,
+  curs: &mut Cursor<Vec<u8>>,
+  ctx: PropertyContext,
+) -> Result<()> {
+  if let Value::Text {
+    header,
+    bytes,
+    text,
+  } = val
+  {
+    curs.write(header)?;
+    write_byte_string(curs, bytes)?;
+    write_string(curs, text)?;
+    Ok(())
+  } else {
+    unreachable!()
+  }
+}
+/// # Panics
+/// Panics if Value is not Text variant
+fn size_of_text(val: &Value, _: &Tag) -> usize {
+  if let Value::Text { bytes, text, .. } = val {
+    9 + 4 + bytes.len() + 1 + 4 + text.as_bytes().len() + 1
+  } else {
+    unreachable!()
   }
 }

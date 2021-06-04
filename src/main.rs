@@ -85,7 +85,7 @@ fn main() {
 
         write!(
             &mut stream,
-            "\n{}% failed ({}/{}\n)",
+            "\n{}% failed ({}/{})\n",
             (failed as f32) / (total as f32) * 100.0,
             failed,
             total
