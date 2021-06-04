@@ -46,16 +46,25 @@ pub fn start_editor_empty() {
 
 pub fn init_editor(editor: Editor) {
   let mut editor = editor;
+  let mut operations = Operations::default();
+
+  ToolEditor::register_ops(&mut operations);
 
   let system = support::init("DRG Editor");
 
   system.main_loop(move |(width, height), run, ui| {
     let dims = (width as f32, height as f32);
-    draw_editor(dims, run, ui, &mut editor);
+    draw_editor(dims, run, ui, &mut editor, &mut operations);
   })
 }
 
-fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mut Editor) {
+fn draw_editor(
+  (width, height): (f32, f32),
+  run: &mut bool,
+  ui: &Ui,
+  editor: &mut Editor,
+  ops: &mut Operations,
+) {
   let frame_color = ui.push_style_color(StyleColor::WindowBg, [0.1, 0.1, 0.12, 1.0]);
 
   let menu_height = 35.0;
@@ -66,13 +75,7 @@ fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mu
 
   // Check keyboard shortcuts
   editor.keyboard.update(ui);
-  for operation in OPERATIONS {
-    if editor.keyboard.chord_available() && operation.is_activated(&editor.keyboard) {
-      editor.keyboard.trigger_chord();
-      operation.run(editor, ui);
-    }
-  }
-  ToolEditor::shortcuts(editor, ui);
+  ops.run(editor, ui);
 
   draw_menu([0.0, 0.0], [width, menu_height], run, ui, editor);
 

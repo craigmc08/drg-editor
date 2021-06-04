@@ -1,10 +1,10 @@
 use crate::asset::*;
 use crate::editor::internal::*;
 use crate::editor::keyboard::*;
+use crate::editor::operations::*;
+use crate::operation;
 use imgui::*;
 use winit::event::VirtualKeyCode;
-
-const NAME_REPLACER_SHORTCUT: Shortcut = Shortcut::new(VirtualKeyCode::R).ctrl(true);
 
 pub enum ToolEditor {
   NameReplacer(NameReplacerTool),
@@ -42,20 +42,6 @@ impl ToolEditor {
     None
   }
 
-  /// Checks for shortcut activation on tools
-  ///
-  /// TODO: These should be registered to some global Operations list somewhere
-  /// Not sure best way to do this
-  pub fn shortcuts(editor: &mut Editor, _: &Ui) {
-    if editor.state.has_header()
-      && editor.keyboard.chord_available()
-      && NAME_REPLACER_SHORTCUT.is_released(&editor.keyboard)
-    {
-      editor.keyboard.trigger_chord();
-      editor.tool = Some(ToolEditor::NameReplacer(NameReplacerTool::default()));
-    }
-  }
-
   pub fn draw(&mut self, state: &mut State, ui: &Ui, done: &mut bool) {
     let w = Window::new(tool!(self).tool_name()).always_auto_resize(true);
     w.build(&ui, || {
@@ -69,6 +55,19 @@ impl ToolEditor {
         *done = true;
       }
     });
+  }
+
+  fn start_name_replacer(editor: &mut Editor, ui: &Ui) {
+    editor.tool = Some(Self::NameReplacer(NameReplacerTool::default()));
+  }
+}
+
+impl HasOperations for ToolEditor {
+  fn register_ops(ops: &mut Operations) {
+    ops.push(operation!(
+      Shortcut::new(VirtualKeyCode::R).ctrl(true),
+      ToolEditor::start_name_replacer
+    ));
   }
 }
 

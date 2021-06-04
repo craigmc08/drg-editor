@@ -4,6 +4,7 @@ use winit::event::VirtualKeyCode;
 
 pub const CHORD_COOLDOWN: Duration = Duration::from_millis(500);
 
+#[derive(Clone, Copy)]
 pub struct Shortcut {
   ctrl: bool,
   shift: bool,

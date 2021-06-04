@@ -1,5 +1,6 @@
 use crate::asset::*;
 use crate::editor::keyboard::*;
+use crate::editor::operations::*;
 use crate::editor::plugins::*;
 use crate::editor::tools::*;
 use imgui::*;
