@@ -1,4 +1,5 @@
 use crate::asset::*;
+use crate::editor::keyboard::*;
 use crate::editor::plugins::*;
 use crate::editor::tools::*;
 use imgui::*;
@@ -57,6 +58,13 @@ pub enum State {
 }
 
 impl State {
+  pub fn is_header(&self) -> bool {
+    match self {
+      Self::Header { .. } => true,
+      _ => false,
+    }
+  }
+
   pub fn has_header(&self) -> bool {
     match self {
       Self::None => false,
@@ -125,6 +133,7 @@ pub struct Editor {
   pub state: State,
   pub err: Option<anyhow::Error>,
   pub tool: Option<ToolEditor>,
+  pub keyboard: Keyboard,
 }
 
 /// Returns some value if the Dependency is changed
@@ -197,4 +206,22 @@ pub fn input_dependency(
   } else {
     None
   }
+}
+
+pub fn error_modal(editor: &mut Editor, ui: &Ui) {
+  ui.popup_modal(im_str!("Error")).build(|| {
+    if let Some(err) = &editor.err {
+      ui.text(format!("{}", err));
+      ui.text("Caused by:");
+      err.chain().skip(1).enumerate().for_each(|(i, cause)| {
+        ui.text(format!("    {}: {}", i, cause));
+      });
+      ui.spacing();
+      if ui.button(im_str!("Ok"), [0.0, 0.0]) {
+        ui.close_current_popup();
+      }
+    } else {
+      ui.close_current_popup();
+    }
+  });
 }
