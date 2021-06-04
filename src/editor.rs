@@ -1,12 +1,16 @@
 use crate::asset::*;
 
 mod internal;
+mod keyboard;
+mod operations;
 mod plugins;
 mod support;
 mod tools;
 
 use imgui::*;
 use internal::*;
+use keyboard::*;
+use operations::*;
 use plugins::*;
 use std::path::Path;
 use tinyfiledialogs::{open_file_dialog, save_file_dialog_with_filter};
@@ -20,6 +24,7 @@ pub fn start_editor_with_path(fp: &Path) {
       state: State::None,
       err: Some(err),
       tool: None,
+      keyboard: Keyboard::default(),
     },
     Ok(header) => Editor {
       state: State::Header {
@@ -29,6 +34,7 @@ pub fn start_editor_with_path(fp: &Path) {
       },
       err: None,
       tool: None,
+      keyboard: Keyboard::default(),
     },
   };
   init_editor(editor)
@@ -55,6 +61,17 @@ fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mu
   let menu_height = 35.0;
   let (left, top) = (0.0, menu_height);
   let (width, height) = (width, height - menu_height);
+
+  error_modal(editor, ui);
+
+  // Check keyboard shortcuts
+  editor.keyboard.update(ui);
+  for operation in OPERATIONS {
+    if editor.keyboard.chord_available() && operation.is_activated(&editor.keyboard) {
+      editor.keyboard.trigger_chord();
+      operation.run(editor, ui);
+    }
+  }
 
   draw_menu([0.0, 0.0], [width, menu_height], run, ui, editor);
 
@@ -142,27 +159,10 @@ fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mu
 fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mut Editor) {
   if let Some(main_menu_bar) = ui.begin_main_menu_bar() {
     if let Some(file_menu) = ui.begin_menu(im_str!("File"), true) {
+      error_modal(editor, ui);
       // FILE > OPEN
       if MenuItem::new(im_str!("Open")).build(ui) {
-        if let Some(fp) = open_file_dialog(
-          "Open Asset",
-          "",
-          Some((&["*.uasset"], "DRG Asset file (*.uasset)")),
-        ) {
-          match AssetHeader::read_from(fp.as_ref()) {
-            Err(err) => {
-              editor.err = Some(err);
-              ui.open_popup(im_str!("MenuError"));
-            }
-            Ok(header) => {
-              editor.state = State::Header {
-                header,
-                path: Box::from(fp.as_ref()),
-                import_editor: ImportEditor::default(),
-              }
-            }
-          }
-        }
+        operations::io::open(editor, ui);
       }
 
       // FILE > SAVE
@@ -170,29 +170,7 @@ fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mu
         .enabled(editor.state.has_header())
         .build(ui)
       {
-        if let Some(fp) =
-          save_file_dialog_with_filter("Save Asset", "", &["*.uasset"], "DRG Asset file (*.uasset)")
-        {
-          match &mut editor.state {
-            State::None => {
-              // Unreachable, disabled for None
-            }
-            State::Header { header, .. } => {
-              header.recalculate_offsets();
-              if let Err(err) = header.write_out(fp.as_ref()) {
-                editor.err = Some(err);
-                ui.open_popup(im_str!("MenuError"));
-              }
-            }
-            State::Asset { asset, .. } => {
-              asset.recalculate_offsets();
-              if let Err(err) = asset.write_out(fp.as_ref()) {
-                editor.err = Some(err);
-                ui.open_popup(im_str!("MenuError"));
-              }
-            }
-          }
-        }
+        operations::io::save(editor, ui);
       }
 
       if MenuItem::new(im_str!("Exit")).build(ui) {
@@ -209,22 +187,6 @@ fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mu
 
       edit_menu.end(ui);
     }
-
-    ui.popup_modal(im_str!("MenuError")).build(|| {
-      if let Some(err) = &editor.err {
-        ui.text(format!("{}", err));
-        ui.text("Caused by:");
-        err.chain().skip(1).enumerate().for_each(|(i, cause)| {
-          ui.text(format!("    {}: {}", i, cause));
-        });
-        ui.spacing();
-        if ui.button(im_str!("Ok"), [0.0, 0.0]) {
-          ui.close_current_popup();
-        }
-      } else {
-        ui.close_current_popup();
-      }
-    });
 
     main_menu_bar.end(ui);
   }
@@ -332,67 +294,20 @@ fn draw_imports_editor(
 }
 
 fn draw_exports_loader(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Editor) {
-  if let State::Header {
-    header,
-    path,
-    import_editor,
-  } = std::mem::take(&mut editor.state)
-  {
-    let w = Window::new(im_str!("Exports"))
-      .flags(MAIN_WINDOW_FLAGS)
-      .resizable(false)
-      .collapsible(false)
-      .movable(false)
-      .position(pos, Condition::Always)
-      .size(size, Condition::Always);
-    w.build(&ui, || {
-      if ui.button(im_str!("Load Export Data"), [0.0, 0.0]) {
-        match AssetExports::read_from(&header, &path) {
-          Err(err) => {
-            editor.err = Some(err);
-            editor.state = State::Header {
-              header,
-              path,
-              import_editor,
-            };
-            ui.open_popup(im_str!("Error"));
-          }
-          Ok(uexp) => {
-            editor.state = State::Asset {
-              asset: Asset::new(header, uexp),
-              path: path,
-              import_editor: import_editor,
-              export_editor: ExportEditor::default(),
-            }
-          }
-        }
-      } else {
-        editor.state = State::Header {
-          header,
-          path,
-          import_editor,
-        }
-      }
+  let w = Window::new(im_str!("Exports"))
+    .flags(MAIN_WINDOW_FLAGS)
+    .resizable(false)
+    .collapsible(false)
+    .movable(false)
+    .position(pos, Condition::Always)
+    .size(size, Condition::Always);
+  w.build(&ui, || {
+    error_modal(editor, ui);
 
-      ui.popup_modal(im_str!("Error")).build(|| {
-        if let Some(err) = &editor.err {
-          ui.text(format!("{}", err));
-          ui.text("Caused by:");
-          err.chain().skip(1).enumerate().for_each(|(i, cause)| {
-            ui.text(format!("    {}: {}", i, cause));
-          });
-          ui.spacing();
-          if ui.button(im_str!("Ok"), [0.0, 0.0]) {
-            ui.close_current_popup();
-          }
-        } else {
-          ui.close_current_popup();
-        }
-      });
-    });
-  } else {
-    unreachable!();
-  }
+    if ui.button(im_str!("Load Export Data"), [0.0, 0.0]) {
+      operations::io::load_exports(editor, ui);
+    }
+  });
 }
 
 fn draw_exports_selector(
