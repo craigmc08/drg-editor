@@ -70,19 +70,19 @@ impl Property {
     if let Some(meta) = Meta::deserialize(rdr, ctx)? {
       let loader = Self::get_loader_for(meta.typ)?;
 
-      println!("Entering tag for {} at {:#X}", meta.typ, rdr.position());
+      // println!("Entering tag for {} at {:#X}", meta.typ, rdr.position());
       let tag = loader.deserialize_tag(rdr, ctx)?;
 
       // Read 0x00 between tag and value
       rdr.read_exact(&mut [0])?;
 
-      println!("Entering value for {} at {:#X}", meta.typ, rdr.position());
+      // println!("Entering value for {} at {:#X}", meta.typ, rdr.position());
 
       rdr.limit(meta.size as usize);
       let value = loader.deserialize_value(rdr, &tag, meta.size, ctx)?;
       rdr.unlimit();
 
-      println!("Exiting value for {} at {:#X} \n", meta.typ, rdr.position());
+      // println!("Exiting value for {} at {:#X} \n", meta.typ, rdr.position());
 
       Ok(Some(Self { meta, tag, value }))
     } else {
