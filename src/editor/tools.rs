@@ -1,6 +1,10 @@
 use crate::asset::*;
 use crate::editor::internal::*;
+use crate::editor::keyboard::*;
 use imgui::*;
+use winit::event::VirtualKeyCode;
+
+const NAME_REPLACER_SHORTCUT: Shortcut = Shortcut::new(VirtualKeyCode::R).ctrl(true);
 
 pub enum ToolEditor {
   NameReplacer(NameReplacerTool),
@@ -28,6 +32,7 @@ impl ToolEditor {
   /// ```
   pub fn menu_items(state: &State, ui: &Ui) -> Option<Self> {
     if MenuItem::new(im_str!("Replace Name"))
+      .shortcut(im_str!("Ctrl+R"))
       .enabled(state.has_header())
       .build(ui)
     {
@@ -35,6 +40,20 @@ impl ToolEditor {
     }
 
     None
+  }
+
+  /// Checks for shortcut activation on tools
+  ///
+  /// TODO: These should be registered to some global Operations list somewhere
+  /// Not sure best way to do this
+  pub fn shortcuts(editor: &mut Editor, _: &Ui) {
+    if editor.state.has_header()
+      && editor.keyboard.chord_available()
+      && NAME_REPLACER_SHORTCUT.is_released(&editor.keyboard)
+    {
+      editor.keyboard.trigger_chord();
+      editor.tool = Some(ToolEditor::NameReplacer(NameReplacerTool::default()));
+    }
   }
 
   pub fn draw(&mut self, state: &mut State, ui: &Ui, done: &mut bool) {
