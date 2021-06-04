@@ -64,6 +64,12 @@ impl State {
       _ => false,
     }
   }
+  pub fn is_none(&self) -> bool {
+    match self {
+      Self::None => true,
+      _ => false,
+    }
+  }
 
   pub fn has_header(&self) -> bool {
     match self {

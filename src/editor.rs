@@ -72,6 +72,7 @@ fn draw_editor((width, height): (f32, f32), run: &mut bool, ui: &Ui, editor: &mu
       operation.run(editor, ui);
     }
   }
+  ToolEditor::shortcuts(editor, ui);
 
   draw_menu([0.0, 0.0], [width, menu_height], run, ui, editor);
 
@@ -161,12 +162,16 @@ fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mu
     if let Some(file_menu) = ui.begin_menu(im_str!("File"), true) {
       error_modal(editor, ui);
       // FILE > OPEN
-      if MenuItem::new(im_str!("Open")).build(ui) {
+      if MenuItem::new(im_str!("Open"))
+        .shortcut(im_str!("Ctrl+O"))
+        .build(ui)
+      {
         operations::io::open(editor, ui);
       }
 
       // FILE > SAVE
       if MenuItem::new(im_str!("Save As"))
+        .shortcut(im_str!("Ctrl+S"))
         .enabled(editor.state.has_header())
         .build(ui)
       {
@@ -304,7 +309,7 @@ fn draw_exports_loader(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edit
   w.build(&ui, || {
     error_modal(editor, ui);
 
-    if ui.button(im_str!("Load Export Data"), [0.0, 0.0]) {
+    if ui.button(im_str!("Load Export Data [Ctrl+Shift+L]"), [0.0, 0.0]) {
       operations::io::load_exports(editor, ui);
     }
   });

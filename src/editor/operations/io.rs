@@ -35,12 +35,16 @@ pub fn open(editor: &mut Editor, ui: &Ui) {
 }
 
 pub fn save(editor: &mut Editor, ui: &Ui) {
+  if editor.state.is_none() {
+    return;
+  }
+
   if let Some(fp) =
     save_file_dialog_with_filter("Save Asset", "", &["*.uasset"], "DRG Asset file (*.uasset)")
   {
     match &mut editor.state {
       State::None => {
-        // Unreachable, disabled for None
+        unreachable!()
       }
       State::Header { header, .. } => {
         header.recalculate_offsets();
