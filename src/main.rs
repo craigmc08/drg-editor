@@ -53,7 +53,7 @@ fn main() {
     } else if args.len() == 3 && args[1] == "all" {
         // All mode
 
-        let mut stream = BufWriter::new(File::create("output.txt").unwrap());
+        let mut stream = BufWriter::new(File::create("out/all.txt").unwrap());
 
         let mut steps = 0;
         let mut total = 0;
