@@ -199,7 +199,7 @@ impl EditorPlugin {
       PluginType::PluginFloat { value } => {
         let prev = *value;
         ui.input_float(im_str!("Float"), value).build();
-        prev != *value
+        (prev - *value).abs() > f32::EPSILON
       }
       PluginType::PluginInt { value } => {
         let prev = *value;

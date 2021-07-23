@@ -85,10 +85,10 @@ impl Generation {
     Ok(generations)
   }
 
-  fn write_array(gens: &Vec<Generation>, curs: &mut Cursor<Vec<u8>>) -> Result<()> {
+  fn write_array(gens: &[Generation], curs: &mut Cursor<Vec<u8>>) -> Result<()> {
     write_u32(curs, gens.len() as u32)?;
-    for i in 0..gens.len() {
-      gens[i].write(curs)?;
+    for gen in gens.iter() {
+      gen.write(curs)?;
     }
     Ok(())
   }

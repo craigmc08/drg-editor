@@ -13,11 +13,7 @@ pub struct Meta {
 
 impl Meta {
   pub fn new(name: NameVariant, typ: PropType, size: u64) -> Self {
-    Self {
-      name: name.into(),
-      typ,
-      size,
-    }
+    Self { name, typ, size }
   }
 
   pub fn deserialize(rdr: &mut ByteReader, ctx: PropertyContext) -> Result<Option<Self>> {

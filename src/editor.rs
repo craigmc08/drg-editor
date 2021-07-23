@@ -29,7 +29,7 @@ pub fn start_editor_with_path(fp: &Path) {
     Ok(header) => Editor {
       state: State::Header {
         header,
-        path: Box::from(fp.clone()),
+        path: Box::from(fp),
         import_editor: ImportEditor::default(),
       },
       err: None,

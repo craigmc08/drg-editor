@@ -131,7 +131,7 @@ impl Names {
       let start_pos = rdr.position();
       let mut name = Name::read(rdr)
         .with_context(|| format!("Failed to parse name starting at {:#X}", start_pos))?;
-      name.index = i.into();
+      name.index = i;
       names.push(name);
     }
     Ok(Names { names })
@@ -150,7 +150,7 @@ impl Names {
     for name in self.names.iter() {
       size += 8 + name.name.len() + 1;
     }
-    return size;
+    size
   }
 
   pub fn get_name_obj(&self, name: &str) -> Option<&Name> {
@@ -159,7 +159,7 @@ impl Names {
         return Some(own_name);
       }
     }
-    return None;
+    None
   }
 
   pub fn lookup(&self, index: u32) -> Result<&Name> {
@@ -187,7 +187,7 @@ impl Names {
       case_preserving_hash: 0,
     };
     self.names.push(name_obj);
-    return true;
+    true
   }
 
   /// Checks that name is in the names map and returns its position. Otherwise

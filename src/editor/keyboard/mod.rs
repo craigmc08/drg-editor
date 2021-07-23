@@ -57,7 +57,7 @@ impl Shortcut {
     if !keys.is_key_down(self.key) {
       return false;
     }
-    return true;
+    true
   }
 }
 

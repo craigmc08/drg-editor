@@ -2,6 +2,7 @@ use crate::asset::*;
 use crate::reader::*;
 use crate::util::*;
 use byteorder::{LittleEndian, ReadBytesExt};
+use std::cmp::Ordering;
 use std::io::Cursor;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -35,14 +36,16 @@ impl Reference {
   }
 
   pub fn deserialize(idx: i32, imports: &Imports, exports: &Exports) -> Result<Self> {
-    if idx == 0 {
-      Ok(Self::UObject)
-    } else if idx < 0 {
-      let import = imports.lookup((-idx - 1) as u64)?;
-      Ok(Self::Import(import.name.clone()))
-    } else {
-      let export = exports.lookup((idx - 1) as u64)?;
-      Ok(Self::Export(export.object_name.clone()))
+    match idx.cmp(&0) {
+      Ordering::Equal => Ok(Self::UObject),
+      Ordering::Less => {
+        let import = imports.lookup((-idx - 1) as u64)?;
+        Ok(Self::Import(import.name.clone()))
+      }
+      Ordering::Greater => {
+        let export = exports.lookup((idx - 1) as u64)?;
+        Ok(Self::Export(export.object_name.clone()))
+      }
     }
   }
 
@@ -73,7 +76,7 @@ impl Reference {
 
   pub fn to_string(&self, names: &Names) -> String {
     match self {
-      Self::UObject => format!("UObject"),
+      Self::UObject => "UObject".to_string(),
       Self::Import(name) => format!("Import {}", name.to_string(names)),
       Self::Export(name) => format!("Export {}", name.to_string(names)),
     }

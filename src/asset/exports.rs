@@ -138,7 +138,7 @@ impl Exports {
 
       exports.push(object);
     }
-    return Ok(Exports { exports });
+    Ok(Exports { exports })
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names) -> Result<()> {

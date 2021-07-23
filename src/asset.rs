@@ -65,18 +65,18 @@ impl AssetHeader {
 
   pub fn read(uasset: Vec<u8>) -> Result<Self> {
     let mut rdr = ByteReader::new(uasset);
-    let summary = FileSummary::read(&mut rdr).with_context(|| format!("Failed to read summary"))?;
-    let names = Names::read(&mut rdr, &summary).with_context(|| format!("Failed to read names"))?;
-    let imports = Imports::read(&mut rdr, &summary, &names)
-      .with_context(|| format!("Failed to read imports"))?;
-    let exports = Exports::read(&mut rdr, &summary, &names)
-      .with_context(|| format!("Failed to read exports"))?;
+    let summary = FileSummary::read(&mut rdr).with_context(|| "Failed to read summary")?;
+    let names = Names::read(&mut rdr, &summary).with_context(|| "Failed to read names")?;
+    let imports =
+      Imports::read(&mut rdr, &summary, &names).with_context(|| "Failed to read imports")?;
+    let exports =
+      Exports::read(&mut rdr, &summary, &names).with_context(|| "Failed to read exports")?;
     let depends =
-      Depends::read(&mut rdr, &summary).with_context(|| format!("Failed to read dependencies"))?;
-    let assets = AssetRegistry::read(&mut rdr, &summary)
-      .with_context(|| format!("Failed to read asset registry"))?;
+      Depends::read(&mut rdr, &summary).with_context(|| "Failed to read dependencies")?;
+    let assets =
+      AssetRegistry::read(&mut rdr, &summary).with_context(|| "Failed to read asset registry")?;
     let dependencies = PreloadDependencies::read(&mut rdr, &summary, &imports, &exports)
-      .with_context(|| format!("Failed to read preload dependencies"))?;
+      .with_context(|| "Failed to read preload dependencies")?;
     Ok(Self {
       summary,
       names,
@@ -209,7 +209,7 @@ impl AssetExports {
         )
       })?;
     }
-    cursor.write(&header.summary.tag)?;
+    cursor.write_all(&header.summary.tag)?;
     Ok(cursor.into_inner())
   }
 }

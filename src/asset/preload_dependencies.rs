@@ -34,7 +34,7 @@ impl PreloadDependencies {
       dependencies.push(reference);
     }
 
-    return Ok(PreloadDependencies { dependencies });
+    Ok(PreloadDependencies { dependencies })
   }
 
   pub fn write(

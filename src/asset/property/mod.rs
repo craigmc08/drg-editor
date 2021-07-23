@@ -77,7 +77,7 @@ impl Property {
     LOADERS
       .iter()
       .find(|l| l.is_for_type(typ))
-      .ok_or(anyhow!("No reader for {}", typ))
+      .ok_or_else(|| anyhow!("No reader for {}", typ))
   }
 
   pub fn deserialize(rdr: &mut ByteReader, ctx: PropertyContext) -> Result<Option<Self>> {

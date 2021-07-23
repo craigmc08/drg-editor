@@ -23,12 +23,12 @@ impl Import {
     let class = NameVariant::read(rdr, name_map).with_context(|| "class")?;
     let outer_index = rdr.read_i32::<LittleEndian>()?;
     let name = NameVariant::read(rdr, name_map).with_context(|| "name")?;
-    return Ok(Import {
+    Ok(Import {
       class_package,
       class,
       outer_index,
       name,
-    });
+    })
   }
 
   fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names) -> Result<()> {
@@ -60,7 +60,7 @@ impl Imports {
         .with_context(|| format!("Failed to parse import starting at {:#X}", start_pos))?;
       objects.push(object);
     }
-    return Ok(Imports { objects });
+    Ok(Imports { objects })
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names) -> Result<()> {
@@ -76,14 +76,12 @@ impl Imports {
   }
 
   pub fn index_of(&self, object: &NameVariant) -> Option<i32> {
-    let mut i: i32 = 0;
-    for import in self.objects.iter() {
+    for (i, import) in self.objects.iter().enumerate() {
       if import.name == *object {
-        return Some(-i - 1);
+        return Some(-(i as i32) - 1);
       }
-      i += 1;
     }
-    return None;
+    None
   }
 
   pub fn serialized_index_of(&self, object: &NameVariant) -> Option<u32> {
@@ -98,7 +96,7 @@ impl Imports {
         self.objects.len()
       );
     }
-    return Ok(&self.objects[index as usize]);
+    Ok(&self.objects[index as usize])
   }
 
   pub fn add(
@@ -122,6 +120,6 @@ impl Imports {
     };
     let len = self.objects.len();
     self.objects.push(object);
-    return -(len as i32) - 1;
+    -(len as i32) - 1
   }
 }

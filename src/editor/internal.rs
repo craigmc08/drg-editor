@@ -59,16 +59,10 @@ pub enum State {
 
 impl State {
   pub fn is_header(&self) -> bool {
-    match self {
-      Self::Header { .. } => true,
-      _ => false,
-    }
+    matches!(self, Self::Header { .. })
   }
   pub fn is_none(&self) -> bool {
-    match self {
-      Self::None => true,
-      _ => false,
-    }
+    matches!(self, Self::None { .. })
   }
 
   pub fn has_header(&self) -> bool {
@@ -141,8 +135,8 @@ pub fn input_dependency(
     changed = true;
     new_dep = match current_item {
       0 => Reference::uobject(),
-      1 => Reference::import(prev_name.unwrap_or(header.list_imports()[0].name.clone())),
-      2 => Reference::export(prev_name.unwrap_or(header.list_exports()[0].clone())),
+      1 => Reference::import(prev_name.unwrap_or_else(|| header.list_imports()[0].name.clone())),
+      2 => Reference::export(prev_name.unwrap_or_else(|| header.list_exports()[0].clone())),
       _ => unreachable!(),
     }
   }

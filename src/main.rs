@@ -39,12 +39,9 @@ fn main() {
       }
       Ok(asset) => {
         asset.recalculate_offsets();
-        match asset.write_out("out/out.uasset".as_ref()) {
-          Err(err) => {
-            println!("Failed to write asset");
-            println!("{:?}", err);
-          }
-          Ok(_) => {}
+        if let Err(err) = asset.write_out("out/out.uasset".as_ref()) {
+          println!("Failed to write asset");
+          println!("{:?}", err);
         }
       }
     }
@@ -55,17 +52,15 @@ fn main() {
 
     let mut stream = BufWriter::new(File::create("out/all.txt").unwrap());
 
-    let mut steps = 0;
     let mut total = 0;
     let mut failed = 0;
-    for entry in WalkDir::new(args[2].clone()) {
+    for (steps, entry) in WalkDir::new(args[2].clone()).into_iter().enumerate() {
       if steps % 1000 == 0 {
         println!(
           "Processed {} entries ({}/{} are assets)",
           steps, total, steps
         );
       }
-      steps += 1;
 
       let entry = entry.unwrap();
       let fp = entry.path();
