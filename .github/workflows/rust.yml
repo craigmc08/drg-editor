@@ -4,7 +4,7 @@ name: Continuous integration
 
 jobs:
   check:
-    name: Check
+    name: Build
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
@@ -15,7 +15,11 @@ jobs:
           override: true
       - uses: actions-rs/cargo@v1
         with:
-          command: check
+          command: build
+      - uses: actions/upload-artifact@v2
+        with:
+          name: debug-build
+          path: target/debug/drg-editor.exe
 
   test:
     name: Test Suite
