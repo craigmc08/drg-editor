@@ -54,16 +54,4 @@ impl PreloadDependencies {
     // 4 bytes per string index
     self.dependencies.len() * 4
   }
-
-  // TODO check for duplicates
-  pub fn add_import(&mut self, names: &Names, name: &str) -> () {
-    self
-      .dependencies
-      .push(Reference::import(NameVariant::parse(name, names)));
-  }
-  pub fn add_export(&mut self, names: &Names, name: &str) -> () {
-    self
-      .dependencies
-      .push(Reference::export(NameVariant::parse(name, names)));
-  }
 }

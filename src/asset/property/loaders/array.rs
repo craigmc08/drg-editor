@@ -1,6 +1,5 @@
 use crate::asset::property::context::*;
 use crate::asset::property::loaders::PropertyLoader;
-use crate::asset::property::meta::*;
 use crate::asset::property::prop_type::*;
 use crate::asset::*;
 use crate::loader;
@@ -90,7 +89,7 @@ fn serialize_array(
       Ok(())
     }
     (Value::RawData { data }, _) => {
-      curs.write(data)?;
+      curs.write_all(data)?;
       Ok(())
     }
     _ => {

@@ -124,10 +124,4 @@ impl Imports {
     self.objects.push(object);
     return -(len as i32) - 1;
   }
-
-  pub fn read_import(&self, rdr: &mut ByteReader) -> Result<NameVariant> {
-    let index_raw = rdr.read_u32::<LittleEndian>()?;
-    let index = std::u32::MAX - index_raw; // import indices are stored as -index - 1, for some reason
-    Ok(self.lookup(index.into()).map(|x| x.name.clone())?)
-  }
 }

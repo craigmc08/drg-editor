@@ -82,7 +82,7 @@ impl NameVariant {
     };
 
     names.add(&name);
-    Self::new(txt, 0, names)
+    Self::new(txt, variant, names)
   }
 
   pub fn read(rdr: &mut ByteReader, names: &Names) -> Result<Self> {
@@ -96,7 +96,7 @@ impl NameVariant {
     Ok(Self::new(&name, variant, names))
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names) -> Result<()> {
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, _names: &Names) -> Result<()> {
     write_u32(curs, self.name_idx as u32)?;
     write_u32(curs, self.variant)?;
     Ok(())
@@ -202,14 +202,6 @@ impl Names {
       pos
     } else {
       panic!("Missing name '{}' in Names", name)
-    }
-  }
-
-  pub fn read_name(&self, rdr: &mut ByteReader) -> Result<String> {
-    let index = rdr.read_u32::<LittleEndian>()?;
-    match self.lookup(index).map(|x| x.name.clone()) {
-      Err(err) => bail!("{} at {:04X}", err, rdr.position()),
-      Ok(x) => Ok(x),
     }
   }
 }

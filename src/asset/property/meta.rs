@@ -41,8 +41,4 @@ impl Meta {
   pub fn byte_size(&self) -> usize {
     24
   }
-
-  pub fn maybe_byte_size(meta: &Option<Self>) -> usize {
-    meta.as_ref().map(Self::byte_size).unwrap_or(8)
-  }
 }

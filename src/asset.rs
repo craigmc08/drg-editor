@@ -69,7 +69,7 @@ impl AssetHeader {
     let names = Names::read(&mut rdr, &summary).with_context(|| format!("Failed to read names"))?;
     let imports = Imports::read(&mut rdr, &summary, &names)
       .with_context(|| format!("Failed to read imports"))?;
-    let exports = Exports::read(&mut rdr, &summary, &names, &imports)
+    let exports = Exports::read(&mut rdr, &summary, &names)
       .with_context(|| format!("Failed to read exports"))?;
     let depends =
       Depends::read(&mut rdr, &summary).with_context(|| format!("Failed to read dependencies"))?;
@@ -104,12 +104,16 @@ impl AssetHeader {
       .with_context(|| "Failed to write imports")?;
     self
       .exports
-      .write(&mut cursor, &self.names, &self.imports)
+      .write(&mut cursor, &self.names)
       .with_context(|| "Failed to write exports")?;
+    self
+      .depends
+      .write(&mut cursor)
+      .with_context(|| "Failed to write dependencies")?;
     self
       .assets
       .write(&mut cursor)
-      .with_context(|| "Failed to write dependencies or asset registry")?;
+      .with_context(|| "Failed to write asset registry")?;
     self
       .dependencies
       .write(&mut cursor, &self.names, &self.imports, &self.exports)
@@ -124,7 +128,7 @@ impl AssetHeader {
     let import_offset = names_offset + self.names.byte_size();
     let export_offset = import_offset + self.imports.byte_size();
     let deps_offset = export_offset + self.exports.byte_size();
-    let assets_offset = deps_offset + 4;
+    let assets_offset = deps_offset + self.depends.byte_size();
     let preload_offset = assets_offset + self.assets.byte_size();
     let structs_offset = deps_offset + self.dependencies.byte_size() + 4;
     let total_header_size = structs_offset - 4; // Without the end tag? TODO check this
@@ -300,7 +304,7 @@ impl Asset {
     &mut self.exports.structs
   }
 
-  pub fn recalculate_offsets(&mut self) -> () {
+  pub fn recalculate_offsets(&mut self) {
     let structs_size = self
       .structs()
       .iter()

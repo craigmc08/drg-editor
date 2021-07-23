@@ -185,7 +185,7 @@ fn serialize_name(
   }
 }
 
-fn deserialize_str(rdr: &mut ByteReader, _: &Tag, _: u64, ctx: PropertyContext) -> Result<Value> {
+fn deserialize_str(rdr: &mut ByteReader, _: &Tag, _: u64, _: PropertyContext) -> Result<Value> {
   Ok(Value::Str(read_string(rdr)?))
 }
 /// # Panics
@@ -194,7 +194,7 @@ fn serialize_str(
   val: &Value,
   _: &Tag,
   curs: &mut Cursor<Vec<u8>>,
-  ctx: PropertyContext,
+  _ctx: PropertyContext,
 ) -> Result<()> {
   if let Value::Str(val) = val {
     write_string(curs, val)?;
@@ -208,7 +208,7 @@ fn serialize_str(
 /// - A 9 byte header: I'm not sure what this represents.
 /// - An array of n bytes, 0 terminated, preceeded by length. Not sure what it represents.
 /// - A string
-fn deserialize_text(rdr: &mut ByteReader, _: &Tag, u: u64, ctx: PropertyContext) -> Result<Value> {
+fn deserialize_text(rdr: &mut ByteReader, _: &Tag, _: u64, _: PropertyContext) -> Result<Value> {
   let header = read_bytes(rdr, 9)?;
   let bytes = read_byte_string(rdr)?;
   let text = read_string(rdr)?;
@@ -224,7 +224,7 @@ fn serialize_text(
   val: &Value,
   _: &Tag,
   curs: &mut Cursor<Vec<u8>>,
-  ctx: PropertyContext,
+  _: PropertyContext,
 ) -> Result<()> {
   if let Value::Text {
     header,
@@ -232,7 +232,7 @@ fn serialize_text(
     text,
   } = val
   {
-    curs.write(header)?;
+    curs.write_all(header)?;
     write_byte_string(curs, bytes)?;
     write_string(curs, text)?;
     Ok(())

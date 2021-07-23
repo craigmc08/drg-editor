@@ -84,7 +84,7 @@ impl Properties {
   }
 
   /// Set the value of a property by name
-  pub fn set<T: AsProperty>(&mut self, name: &str, value: T, names: &Names) -> () {
+  pub fn set<T: AsProperty>(&mut self, name: &str, value: T, names: &Names) {
     let name = NameVariant::parse(name, names);
     let new_prop = value.as_property(name.clone());
     match self
@@ -118,7 +118,7 @@ impl AssetHeader {
   /// asset.import("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun", Reference::UObject);
   /// asset.import("/Script/FSD", "ItemID", "ID_GrapplingGun", Reference::Import("/Game/WeaponsNTools/GrapplingGun/ID_Grappling");
   /// ```
-  pub fn import(&mut self, class_package: &str, class: &str, name: &str, outer: Reference) -> () {
+  pub fn import(&mut self, class_package: &str, class: &str, name: &str, outer: Reference) {
     // Make sure all names are in the names list
     let class_package = NameVariant::parse_and_add(class_package, &mut self.names);
     let class = NameVariant::parse_and_add(class, &mut self.names);
@@ -134,22 +134,6 @@ impl AssetHeader {
         // Create a new import
         let outer_index = outer.serialize(&self.imports, &self.exports);
         self.imports.add(class_package, class, name, outer_index);
-      }
-      Some(_) => {}
-    }
-  }
-
-  /// Add an imported object to the preloaded dependencies
-  pub fn preload(&mut self, dep: Reference) -> () {
-    match self
-      .dependencies
-      .dependencies
-      .iter()
-      .position(|d| d.clone() == dep)
-    {
-      None => {
-        // Create a new preload
-        self.dependencies.dependencies.push(dep);
       }
       Some(_) => {}
     }

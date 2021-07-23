@@ -24,12 +24,11 @@ impl AssetRegistry {
     let assets_len =
       (summary.preload_dependency_offset - summary.asset_registry_data_offset) as usize;
     let data = read_bytes(rdr, assets_len)?;
-
-    return Ok(AssetRegistry { data });
+    Ok(AssetRegistry { data })
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> Result<()> {
-    curs.write(&self.data[..])?;
+    curs.write_all(&self.data[..])?;
     Ok(())
   }
 

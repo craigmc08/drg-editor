@@ -20,9 +20,9 @@ fn main() {
 
   if args.len() == 2 && args[1] == "help" {
     println!("Usage: drg-editor.exe [test|all] [filename]");
-    println!("");
+    println!();
     println!("If the test/all positional argument is given, filename must also be passed.");
-    println!("");
+    println!();
     println!("Options:");
     println!("  -r - For test mod, recursively searches the directory and tests all files");
     println!("  help - Print this message");
@@ -74,18 +74,18 @@ fn main() {
         match &mut Asset::read_from(fp) {
           Err(err) => {
             failed += 1;
-            write!(&mut stream, "FAILED {}: {:?}\n", fp.display(), err).unwrap();
+            writeln!(&mut stream, "FAILED {}: {:?}", fp.display(), err).unwrap();
           }
           Ok(_) => {
-            write!(&mut stream, "SUCCESS {}\n", fp.display()).unwrap();
+            writeln!(&mut stream, "SUCCESS {}", fp.display()).unwrap();
           }
         }
       }
     }
 
-    write!(
+    writeln!(
       &mut stream,
-      "\n{}% failed ({}/{})\n",
+      "\n{}% failed ({}/{})",
       (failed as f32) / (total as f32) * 100.0,
       failed,
       total

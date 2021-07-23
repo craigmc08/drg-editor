@@ -57,7 +57,7 @@ impl ToolEditor {
     });
   }
 
-  fn start_name_replacer(editor: &mut Editor, ui: &Ui) {
+  fn start_name_replacer(editor: &mut Editor, _ui: &Ui) {
     editor.tool = Some(Self::NameReplacer(NameReplacerTool::default()));
   }
 }

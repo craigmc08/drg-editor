@@ -38,12 +38,7 @@ pub struct Exports {
 }
 
 impl Export {
-  fn read(
-    rdr: &mut ByteReader,
-    names: &Names,
-    _imports: &Imports,
-    _exports: &Vec<Export>,
-  ) -> Result<Self> {
+  fn read(rdr: &mut ByteReader, names: &Names) -> Result<Self> {
     let class = read_u32(rdr)?;
     let super_index = rdr.read_i32::<LittleEndian>()?;
     let template = read_u32(rdr)?;
@@ -65,7 +60,7 @@ impl Export {
     let create_before_serialization_dependencies = read_u32(rdr)?;
     let serialization_before_create_dependencies = read_u32(rdr)?;
     let create_before_create_dependencies = read_u32(rdr)?;
-    return Ok(Export {
+    Ok(Export {
       class,
       super_index,
       template,
@@ -88,10 +83,10 @@ impl Export {
       create_before_serialization_dependencies,
       serialization_before_create_dependencies,
       create_before_create_dependencies,
-    });
+    })
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names, _imports: &Imports) -> Result<()> {
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names) -> Result<()> {
     write_u32(curs, self.class)?;
     curs.write_i32::<LittleEndian>(self.super_index)?;
     write_u32(curs, self.template)?;
@@ -107,7 +102,7 @@ impl Export {
     write_bool(curs, self.not_for_client)?;
     write_bool(curs, self.not_for_server)?;
     write_bool(curs, self.was_filtered)?;
-    curs.write(&self.package_guid)?;
+    curs.write_all(&self.package_guid)?;
     write_u32(curs, self.package_flags)?;
     write_bool(curs, self.not_always_loaded_for_editor_game)?;
     write_bool(curs, self.is_asset)?;
@@ -121,12 +116,7 @@ impl Export {
 }
 
 impl Exports {
-  pub fn read(
-    rdr: &mut ByteReader,
-    summary: &FileSummary,
-    names: &Names,
-    imports: &Imports,
-  ) -> Result<Self> {
+  pub fn read(rdr: &mut ByteReader, summary: &FileSummary, names: &Names) -> Result<Self> {
     if rdr.position() != summary.export_offset.into() {
       bail!(
         "Wrong exports starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
@@ -139,7 +129,7 @@ impl Exports {
     let mut export_file_offset = 0;
     for _ in 0..summary.export_count {
       let start_pos = rdr.position();
-      let mut object = Export::read(rdr, names, imports, &exports)
+      let mut object = Export::read(rdr, names)
         .with_context(|| format!("Failed to parse export starting at {:#X}", start_pos))?;
 
       // Compute export_file_offset based on the size of preceeding exports
@@ -151,22 +141,20 @@ impl Exports {
     return Ok(Exports { exports });
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names, imports: &Imports) -> Result<()> {
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names) -> Result<()> {
     for export in self.exports.iter() {
-      export.write(curs, names, imports)?;
+      export.write(curs, names)?;
     }
     Ok(())
   }
 
   pub fn serialized_index_of(&self, object: &NameVariant) -> Option<u32> {
-    let mut i: u32 = 0;
-    for export in self.exports.iter() {
+    for (i, export) in self.exports.iter().enumerate() {
       if export.object_name == *object {
-        return Some(i + 1);
+        return Some(i as u32 + 1);
       }
-      i += 1;
     }
-    return None;
+    None
   }
 
   pub fn lookup(&self, index: u64) -> Result<&Export> {

@@ -113,7 +113,7 @@ impl Property {
     meta.serialize(curs, ctx)?;
 
     loader.serialize_tag(curs, &self.tag, ctx)?;
-    curs.write(&[0])?;
+    curs.write_all(&[0])?;
     loader.serialize_value(curs, &self.value, &self.tag, ctx)?;
     Ok(())
   }
@@ -212,7 +212,7 @@ impl Properties {
         .with_context(|| "Expected None in names")?;
     }
 
-    curs.write(&self.extra[..])?;
+    curs.write_all(&self.extra[..])?;
 
     Ok(())
   }

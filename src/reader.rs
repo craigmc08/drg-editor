@@ -29,16 +29,6 @@ impl ByteReader {
     self.end = self.end_stack.pop();
   }
 
-  pub fn with_limit<F, A>(&mut self, size: usize, f: &mut F) -> A
-  where
-    F: FnMut(&mut Self) -> A,
-  {
-    self.limit(size);
-    let a = f(self);
-    self.unlimit();
-    a
-  }
-
   pub fn position(&self) -> u64 {
     self.current as u64
   }

@@ -70,8 +70,8 @@ pub fn write_byte_string<W: Write, B: AsRef<[u8]>>(curs: &mut W, bytes: B) -> Re
   let bytes = bytes.as_ref();
   let length = bytes.len() + 1;
   write_u32(curs, length as u32)?;
-  curs.write(bytes)?;
-  curs.write(&[0])?;
+  curs.write_all(bytes)?;
+  curs.write_all(&[0])?;
   Ok(())
 }
 

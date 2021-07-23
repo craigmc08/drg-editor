@@ -167,10 +167,10 @@ impl FileSummary {
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> Result<()> {
-    curs.write(&self.tag)?;
+    curs.write_all(&self.tag)?;
     write_u32(curs, self.file_version_ue4)?;
     write_u32(curs, self.file_version_license_ue4)?;
-    curs.write(&self.custom_version)?;
+    curs.write_all(&self.custom_version)?;
     write_u32(curs, self.total_header_size)?;
     write_string(curs, &self.folder_name)?;
     write_u32(curs, self.package_flags)?;
@@ -187,10 +187,10 @@ impl FileSummary {
     write_u32(curs, self.soft_package_references_offset)?;
     write_u32(curs, self.searchable_names_offset)?;
     write_u32(curs, self.thumbnail_table_offset)?;
-    curs.write(&self.guid)?;
+    curs.write_all(&self.guid)?;
     Generation::write_array(&self.generations, curs)?;
-    curs.write(&self.saved_by_engine_version)?;
-    curs.write(&self.compatible_with_engine_version)?;
+    curs.write_all(&self.saved_by_engine_version)?;
+    curs.write_all(&self.compatible_with_engine_version)?;
     write_u32(curs, self.compression_flags)?;
     curs.write_i64::<LittleEndian>(self.package_source)?;
     write_u32(curs, self.asset_registry_data_offset)?;

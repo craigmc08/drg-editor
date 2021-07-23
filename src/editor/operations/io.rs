@@ -1,4 +1,3 @@
-use crate::editor::keyboard::*;
 use crate::editor::operations::*;
 use crate::editor::*;
 use crate::operation;
@@ -87,8 +86,8 @@ pub fn load_exports(editor: &mut Editor, ui: &Ui) {
         Ok(uexp) => {
           editor.state = State::Asset {
             asset: Asset::new(header, uexp),
-            path: path,
-            import_editor: import_editor,
+            path,
+            import_editor,
             export_editor: ExportEditor::default(),
           }
         }

@@ -22,11 +22,11 @@ impl Depends {
 
     let depends_len = (summary.asset_registry_data_offset - summary.depends_offset) as usize;
     let data = read_bytes(rdr, depends_len)?;
-    return Ok(Self { data });
+    Ok(Self { data })
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> Result<()> {
-    curs.write(&self.data[..])?;
+    curs.write_all(&self.data[..])?;
     Ok(())
   }
 

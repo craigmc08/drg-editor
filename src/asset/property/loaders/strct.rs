@@ -31,7 +31,7 @@ fn serialize_struct_tag(tag: &Tag, curs: &mut Cursor<Vec<u8>>, ctx: PropertyCont
     type_name
       .write(curs, ctx.names)
       .with_context(|| "Struct.type_name")?;
-    curs.write(guid)?;
+    curs.write_all(guid)?;
     Ok(())
   } else {
     unreachable!()
@@ -120,7 +120,7 @@ fn serialize_struct(
       Ok(())
     }
     Value::RawData { data } => {
-      curs.write(data)?;
+      curs.write_all(data)?;
       Ok(())
     }
     _ => unreachable!(),

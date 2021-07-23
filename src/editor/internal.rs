@@ -1,6 +1,5 @@
 use crate::asset::*;
 use crate::editor::keyboard::*;
-use crate::editor::operations::*;
 use crate::editor::plugins::*;
 use crate::editor::tools::*;
 use imgui::*;
@@ -80,14 +79,6 @@ impl State {
     }
   }
 
-  pub fn has_asset(&self) -> bool {
-    match self {
-      Self::None => false,
-      Self::Header { .. } => false,
-      Self::Asset { .. } => true,
-    }
-  }
-
   /// # Panics
   /// Panics if `!self.has_header()`
   pub fn header(&self) -> &AssetHeader {
@@ -105,26 +96,6 @@ impl State {
       Self::None => panic!("editor::internal::State::header on None"),
       Self::Header { header, .. } => header,
       Self::Asset { asset, .. } => &mut asset.header,
-    }
-  }
-
-  /// # Panics
-  /// Panics if `!self.has_asset()`
-  pub fn asset(&self) -> &Asset {
-    match self {
-      Self::None => panic!("editor::internal::State::asset on None"),
-      Self::Header { header, .. } => panic!("editor::internal::State::asset on Header"),
-      Self::Asset { asset, .. } => &asset,
-    }
-  }
-
-  /// # Panics
-  /// Panics if `!self.has_asset()`
-  pub fn asset_mut(&mut self) -> &mut Asset {
-    match self {
-      Self::None => panic!("editor::internal::State::asset_mut on None"),
-      Self::Header { .. } => panic!("editor::internal::State::asset_mut on Header"),
-      Self::Asset { asset, .. } => asset,
     }
   }
 }

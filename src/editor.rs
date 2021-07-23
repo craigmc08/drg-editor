@@ -160,7 +160,7 @@ fn draw_editor(
   frame_color.pop(ui);
 }
 
-fn draw_menu(pos: [f32; 2], size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mut Editor) {
+fn draw_menu(_pos: [f32; 2], _size: [f32; 2], run: &mut bool, ui: &Ui, editor: &mut Editor) {
   if let Some(main_menu_bar) = ui.begin_main_menu_bar() {
     if let Some(file_menu) = ui.begin_menu(im_str!("File"), true) {
       error_modal(editor, ui);
@@ -336,12 +336,10 @@ fn draw_exports_selector(
     for export in asset.list_exports() {
       let active = Some(export.clone()) == editor.selected_export;
 
-      if ui.radio_button_bool(&ImString::from(export.to_string(asset.names())), active) {
-        if !active {
-          // The selected export is changing, so have to deselect the property
-          editor.selected_export = Some(export.clone());
-          editor.selected_property = None;
-        }
+      if ui.radio_button_bool(&ImString::from(export.to_string(asset.names())), active) && !active {
+        // The selected export is changing, so have to deselect the property
+        editor.selected_export = Some(export.clone());
+        editor.selected_property = None;
       }
     }
   });
