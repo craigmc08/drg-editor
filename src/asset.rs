@@ -1,18 +1,22 @@
 pub mod asset_registry;
-pub mod export_map;
+pub mod depends;
+pub mod exports;
 pub mod file_summary;
-pub mod name_map;
-pub mod object_imports;
+pub mod imports;
+pub mod names;
 pub mod preload_dependencies;
 pub mod property;
+pub mod reference;
 
 pub use asset_registry::*;
-pub use export_map::*;
+pub use depends::*;
+pub use exports::*;
 pub use file_summary::*;
-pub use name_map::*;
-pub use object_imports::*;
+pub use imports::*;
+pub use names::*;
 pub use preload_dependencies::*;
 pub use property::*;
+pub use reference::*;
 
 use crate::reader::*;
 use anyhow::*;
@@ -22,9 +26,10 @@ use std::path::Path;
 
 pub struct AssetHeader {
   pub summary: FileSummary,
-  pub names: NameMap,
-  pub imports: ObjectImports,
-  pub exports: ObjectExports,
+  pub names: Names,
+  pub imports: Imports,
+  pub exports: Exports,
+  pub depends: Depends,
   pub assets: AssetRegistry,
   pub dependencies: PreloadDependencies,
 }
@@ -61,14 +66,15 @@ impl AssetHeader {
   pub fn read(uasset: Vec<u8>) -> Result<Self> {
     let mut rdr = ByteReader::new(uasset);
     let summary = FileSummary::read(&mut rdr).with_context(|| format!("Failed to read summary"))?;
-    let names =
-      NameMap::read(&mut rdr, &summary).with_context(|| format!("Failed to read names"))?;
-    let imports = ObjectImports::read(&mut rdr, &summary, &names)
+    let names = Names::read(&mut rdr, &summary).with_context(|| format!("Failed to read names"))?;
+    let imports = Imports::read(&mut rdr, &summary, &names)
       .with_context(|| format!("Failed to read imports"))?;
-    let exports = ObjectExports::read(&mut rdr, &summary, &names, &imports)
+    let exports = Exports::read(&mut rdr, &summary, &names, &imports)
       .with_context(|| format!("Failed to read exports"))?;
+    let depends =
+      Depends::read(&mut rdr, &summary).with_context(|| format!("Failed to read dependencies"))?;
     let assets = AssetRegistry::read(&mut rdr, &summary)
-      .with_context(|| format!("Failed to read dependencies or asset registry"))?;
+      .with_context(|| format!("Failed to read asset registry"))?;
     let dependencies = PreloadDependencies::read(&mut rdr, &summary, &imports, &exports)
       .with_context(|| format!("Failed to read preload dependencies"))?;
     Ok(Self {
@@ -76,6 +82,7 @@ impl AssetHeader {
       names,
       imports,
       exports,
+      depends,
       assets,
       dependencies,
     })
@@ -251,24 +258,24 @@ impl Asset {
     &mut self.header.summary
   }
 
-  pub fn names(&self) -> &NameMap {
+  pub fn names(&self) -> &Names {
     &self.header.names
   }
-  pub fn names_mut(&mut self) -> &mut NameMap {
+  pub fn names_mut(&mut self) -> &mut Names {
     &mut self.header.names
   }
 
-  pub fn imports(&self) -> &ObjectImports {
+  pub fn imports(&self) -> &Imports {
     &self.header.imports
   }
-  pub fn imports_mut(&mut self) -> &mut ObjectImports {
+  pub fn imports_mut(&mut self) -> &mut Imports {
     &mut self.header.imports
   }
 
-  pub fn exports(&self) -> &ObjectExports {
+  pub fn exports(&self) -> &Exports {
     &self.header.exports
   }
-  pub fn exports_mut(&mut self) -> &mut ObjectExports {
+  pub fn exports_mut(&mut self) -> &mut Exports {
     &mut self.header.exports
   }
 

@@ -74,7 +74,7 @@ impl Property {
 
 impl Properties {
   /// Get the value of a property by name
-  pub fn get<T: FromProperty>(&self, name: &str, names: &NameMap) -> Option<T> {
+  pub fn get<T: FromProperty>(&self, name: &str, names: &Names) -> Option<T> {
     for prop in self.properties.iter() {
       if prop.meta.name == NameVariant::parse(name, names) {
         return T::from_property(prop);
@@ -84,7 +84,7 @@ impl Properties {
   }
 
   /// Set the value of a property by name
-  pub fn set<T: AsProperty>(&mut self, name: &str, value: T, names: &NameMap) -> () {
+  pub fn set<T: AsProperty>(&mut self, name: &str, value: T, names: &Names) -> () {
     let name = NameVariant::parse(name, names);
     let new_prop = value.as_property(name.clone());
     match self
@@ -115,10 +115,10 @@ impl AssetHeader {
   /// # Examples
   ///
   /// ```
-  /// asset.import("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun", Dependency::UObject);
-  /// asset.import("/Script/FSD", "ItemID", "ID_GrapplingGun", Dependency::Import("/Game/WeaponsNTools/GrapplingGun/ID_Grappling");
+  /// asset.import("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun", Reference::UObject);
+  /// asset.import("/Script/FSD", "ItemID", "ID_GrapplingGun", Reference::Import("/Game/WeaponsNTools/GrapplingGun/ID_Grappling");
   /// ```
-  pub fn import(&mut self, class_package: &str, class: &str, name: &str, outer: Dependency) -> () {
+  pub fn import(&mut self, class_package: &str, class: &str, name: &str, outer: Reference) -> () {
     // Make sure all names are in the names list
     let class_package = NameVariant::parse_and_add(class_package, &mut self.names);
     let class = NameVariant::parse_and_add(class, &mut self.names);
@@ -140,7 +140,7 @@ impl AssetHeader {
   }
 
   /// Add an imported object to the preloaded dependencies
-  pub fn preload(&mut self, dep: Dependency) -> () {
+  pub fn preload(&mut self, dep: Reference) -> () {
     match self
       .dependencies
       .dependencies
@@ -156,7 +156,7 @@ impl AssetHeader {
   }
 
   // List all imports
-  pub fn list_imports(&self) -> &Vec<ObjectImport> {
+  pub fn list_imports(&self) -> &Vec<Import> {
     &self.imports.objects
   }
 
@@ -173,7 +173,7 @@ impl AssetHeader {
 
 impl Asset {
   // List all imports
-  pub fn list_imports(&self) -> &Vec<ObjectImport> {
+  pub fn list_imports(&self) -> &Vec<Import> {
     &self.header.list_imports()
   }
 
@@ -299,7 +299,7 @@ where
   }
 }
 
-impl AsSimpleProperty for Dependency {
+impl AsSimpleProperty for Reference {
   fn simple_prop_type() -> PropType {
     PropType::ObjectProperty
   }
@@ -307,7 +307,7 @@ impl AsSimpleProperty for Dependency {
     Value::Object(self.clone())
   }
 }
-impl FromValue for Dependency {
+impl FromValue for Reference {
   fn from_value(value: &Value) -> Option<Self> {
     match &value {
       Value::Object(value) => Some(value.clone()),

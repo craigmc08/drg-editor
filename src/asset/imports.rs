@@ -5,25 +5,25 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use std::io::Cursor;
 
 #[derive(Debug)]
-pub struct ObjectImport {
+pub struct Import {
   pub class_package: NameVariant,
   pub class: NameVariant,
-  pub outer_index: i32, // idk what this represents
+  pub outer_index: i32,
   pub name: NameVariant,
 }
 
 #[derive(Debug)]
-pub struct ObjectImports {
-  pub objects: Vec<ObjectImport>,
+pub struct Imports {
+  pub objects: Vec<Import>,
 }
 
-impl ObjectImport {
-  fn read(rdr: &mut ByteReader, name_map: &NameMap) -> Result<Self> {
+impl Import {
+  fn read(rdr: &mut ByteReader, name_map: &Names) -> Result<Self> {
     let class_package = NameVariant::read(rdr, name_map).with_context(|| "class_package")?;
     let class = NameVariant::read(rdr, name_map).with_context(|| "class")?;
     let outer_index = rdr.read_i32::<LittleEndian>()?;
     let name = NameVariant::read(rdr, name_map).with_context(|| "name")?;
-    return Ok(ObjectImport {
+    return Ok(Import {
       class_package,
       class,
       outer_index,
@@ -31,7 +31,7 @@ impl ObjectImport {
     });
   }
 
-  fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<()> {
+  fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names) -> Result<()> {
     self
       .class_package
       .write(curs, names)
@@ -43,8 +43,8 @@ impl ObjectImport {
   }
 }
 
-impl ObjectImports {
-  pub fn read(rdr: &mut ByteReader, summary: &FileSummary, name_map: &NameMap) -> Result<Self> {
+impl Imports {
+  pub fn read(rdr: &mut ByteReader, summary: &FileSummary, name_map: &Names) -> Result<Self> {
     if rdr.position() != summary.import_offset.into() {
       bail!(
         "Wrong imports starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
@@ -56,14 +56,14 @@ impl ObjectImports {
     let mut objects = vec![];
     for _ in 0..summary.import_count {
       let start_pos = rdr.position();
-      let object = ObjectImport::read(rdr, name_map)
+      let object = Import::read(rdr, name_map)
         .with_context(|| format!("Failed to parse import starting at {:#X}", start_pos))?;
       objects.push(object);
     }
-    return Ok(ObjectImports { objects });
+    return Ok(Imports { objects });
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<()> {
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names) -> Result<()> {
     for object in self.objects.iter() {
       object.write(curs, names)?;
     }
@@ -90,7 +90,7 @@ impl ObjectImports {
     self.index_of(object).map(|i| i as u32)
   }
 
-  pub fn lookup(&self, index: u64) -> Result<&ObjectImport> {
+  pub fn lookup(&self, index: u64) -> Result<&Import> {
     if index > self.objects.len() as u64 {
       bail!(
         "Import index {} is not in imports (length {})",
@@ -114,7 +114,7 @@ impl ObjectImports {
       return -(index as i32) - 1;
     }
 
-    let object = ObjectImport {
+    let object = Import {
       class_package,
       class,
       outer_index,

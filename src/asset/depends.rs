@@ -6,26 +6,23 @@ use std::io::prelude::*;
 use std::io::Cursor;
 
 #[derive(Debug)]
-pub struct AssetRegistry {
+pub struct Depends {
   pub data: Vec<u8>,
 }
 
-impl AssetRegistry {
+impl Depends {
   pub fn read(rdr: &mut ByteReader, summary: &FileSummary) -> Result<Self> {
-    // Asset registry actually contains both Depends and AssetsRegistry
-    if rdr.position() != summary.asset_registry_data_offset.into() {
+    if rdr.position() != summary.depends_offset.into() {
       bail!(
-        "Wrong asset registry starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
+        "Wrong depends starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
         summary.depends_offset,
         rdr.position(),
       );
     }
 
-    let assets_len =
-      (summary.preload_dependency_offset - summary.asset_registry_data_offset) as usize;
-    let data = read_bytes(rdr, assets_len)?;
-
-    return Ok(AssetRegistry { data });
+    let depends_len = (summary.asset_registry_data_offset - summary.depends_offset) as usize;
+    let data = read_bytes(rdr, depends_len)?;
+    return Ok(Self { data });
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> Result<()> {

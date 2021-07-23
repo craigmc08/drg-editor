@@ -112,7 +112,7 @@ fn deserialize_object(
   _max_size: u64,
   ctx: PropertyContext,
 ) -> Result<Value> {
-  Ok(Value::Object(Dependency::read(
+  Ok(Value::Object(Reference::read(
     rdr,
     ctx.imports,
     ctx.exports,

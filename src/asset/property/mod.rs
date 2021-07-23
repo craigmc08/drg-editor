@@ -22,7 +22,7 @@ use prop_type::*;
 pub enum Value {
   Int(i32),
   Float(f32),
-  Object(Dependency),
+  Object(Reference),
   // TODO: unk1 might be the length of a string that is stored in the SoftObjectProperty
   // Find example of this happening?
   SoftObject {
@@ -136,11 +136,7 @@ pub struct Properties {
 }
 
 impl Properties {
-  pub fn deserialize(
-    rdr: &mut ByteReader,
-    export: &ObjectExport,
-    ctx: PropertyContext,
-  ) -> Result<Self> {
+  pub fn deserialize(rdr: &mut ByteReader, export: &Export, ctx: PropertyContext) -> Result<Self> {
     // Check that start position is correct
     let start_pos = rdr.position();
     if start_pos != export.export_file_offset {

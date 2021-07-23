@@ -256,7 +256,7 @@ fn draw_imports_editor(
 
         // TODO: this name deserialization should probably happen after reading
         // imports during Asset::read. But that will require a bunch of work
-        let outer = Dependency::deserialize(import.outer_index, &header.imports, &header.exports)
+        let outer = Reference::deserialize(import.outer_index, &header.imports, &header.exports)
           .expect("Invalid Import outer");
 
         ui.text(format!(

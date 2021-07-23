@@ -12,7 +12,7 @@ pub enum PluginType {
     original: Property,
   },
   PluginObject {
-    dep: Dependency,
+    dep: Reference,
   },
   PluginArray {
     value_type: PropType,
@@ -215,7 +215,7 @@ impl EditorPlugin {
 
   pub fn default_from_type(typ: PropType, header: &AssetHeader) -> Self {
     let (tag, value) = match typ {
-      PropType::ObjectProperty => (Tag::Simple(typ), Value::Object(Dependency::uobject())),
+      PropType::ObjectProperty => (Tag::Simple(typ), Value::Object(Reference::uobject())),
       PropType::BoolProperty => (Tag::Bool(false), Value::Bool),
       PropType::IntProperty => (Tag::Simple(typ), Value::Int(0)),
       PropType::FloatProperty => (Tag::Simple(typ), Value::Float(0.0)),

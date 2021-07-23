@@ -10,7 +10,7 @@ pub struct EditableImport {
   pub class_package: ImString,
   pub class: ImString,
   pub name: ImString,
-  pub outer: Dependency,
+  pub outer: Reference,
 }
 
 impl Default for EditableImport {
@@ -19,7 +19,7 @@ impl Default for EditableImport {
       class_package: ImString::with_capacity(8),
       class: ImString::with_capacity(8),
       name: ImString::with_capacity(8),
-      outer: Dependency::uobject(),
+      outer: Reference::uobject(),
     }
   }
 }
@@ -143,19 +143,19 @@ pub struct Editor {
   pub keyboard: Keyboard,
 }
 
-/// Returns some value if the Dependency is changed
+/// Returns some value if the Reference is changed
 pub fn input_dependency(
   ui: &Ui,
   label: &str,
   header: &AssetHeader,
-  dep: Dependency,
-) -> Option<Dependency> {
+  dep: Reference,
+) -> Option<Reference> {
   let mut new_dep = dep.clone();
 
   let (prev_item, prev_name) = match dep {
-    Dependency::UObject => (0, None),
-    Dependency::Import(name) => (1, Some(name)),
-    Dependency::Export(name) => (2, Some(name)),
+    Reference::UObject => (0, None),
+    Reference::Import(name) => (1, Some(name)),
+    Reference::Export(name) => (2, Some(name)),
   };
 
   let mut current_item = prev_item;
@@ -169,16 +169,16 @@ pub fn input_dependency(
   if current_item != prev_item {
     changed = true;
     new_dep = match current_item {
-      0 => Dependency::uobject(),
-      1 => Dependency::import(prev_name.unwrap_or(header.list_imports()[0].name.clone())),
-      2 => Dependency::export(prev_name.unwrap_or(header.list_exports()[0].clone())),
+      0 => Reference::uobject(),
+      1 => Reference::import(prev_name.unwrap_or(header.list_imports()[0].name.clone())),
+      2 => Reference::export(prev_name.unwrap_or(header.list_exports()[0].clone())),
       _ => unreachable!(),
     }
   }
 
   match new_dep.clone() {
-    Dependency::UObject => {}
-    Dependency::Import(name) => ComboBox::new(im_str!("Import"))
+    Reference::UObject => {}
+    Reference::Import(name) => ComboBox::new(im_str!("Import"))
       .preview_value(&ImString::from(name.to_string(&header.names)))
       .build(&ui, || {
         for import in header.list_imports() {
@@ -187,12 +187,12 @@ pub fn input_dependency(
             .selected(is_selected)
             .build(&ui)
           {
-            new_dep = Dependency::Import(import.name.clone());
+            new_dep = Reference::Import(import.name.clone());
             changed = changed || !is_selected;
           }
         }
       }),
-    Dependency::Export(name) => ComboBox::new(im_str!("Export"))
+    Reference::Export(name) => ComboBox::new(im_str!("Export"))
       .preview_value(&ImString::from(name.to_string(&header.names)))
       .build(&ui, || {
         for export in header.list_exports() {
@@ -201,7 +201,7 @@ pub fn input_dependency(
             .selected(is_selected)
             .build(&ui)
           {
-            new_dep = Dependency::Export(export);
+            new_dep = Reference::Export(export);
             changed = changed || !is_selected;
           }
         }

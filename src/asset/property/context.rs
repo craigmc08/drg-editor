@@ -3,17 +3,17 @@ use crate::asset::*;
 #[derive(Debug, Clone, Copy)]
 pub struct PropertyContext<'a> {
   pub summary: &'a FileSummary,
-  pub names: &'a NameMap,
-  pub imports: &'a ObjectImports,
-  pub exports: &'a ObjectExports,
+  pub names: &'a Names,
+  pub imports: &'a Imports,
+  pub exports: &'a Exports,
 }
 
 impl<'a> PropertyContext<'a> {
   pub fn new(
     summary: &'a FileSummary,
-    names: &'a NameMap,
-    imports: &'a ObjectImports,
-    exports: &'a ObjectExports,
+    names: &'a Names,
+    imports: &'a Imports,
+    exports: &'a Exports,
   ) -> Self {
     Self {
       summary,

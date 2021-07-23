@@ -7,7 +7,7 @@ use std::io::prelude::*;
 use std::io::Cursor;
 
 #[derive(Debug)]
-pub struct ObjectExport {
+pub struct Export {
   pub class: u32,       // just storing u32 because idc what this is
   pub super_index: i32, // not sure what this represents
   pub template: u32,    // just storing u32 because idc what this is
@@ -33,16 +33,16 @@ pub struct ObjectExport {
 }
 
 #[derive(Debug)]
-pub struct ObjectExports {
-  pub exports: Vec<ObjectExport>,
+pub struct Exports {
+  pub exports: Vec<Export>,
 }
 
-impl ObjectExport {
+impl Export {
   fn read(
     rdr: &mut ByteReader,
-    names: &NameMap,
-    _imports: &ObjectImports,
-    _exports: &Vec<ObjectExport>,
+    names: &Names,
+    _imports: &Imports,
+    _exports: &Vec<Export>,
   ) -> Result<Self> {
     let class = read_u32(rdr)?;
     let super_index = rdr.read_i32::<LittleEndian>()?;
@@ -65,7 +65,7 @@ impl ObjectExport {
     let create_before_serialization_dependencies = read_u32(rdr)?;
     let serialization_before_create_dependencies = read_u32(rdr)?;
     let create_before_create_dependencies = read_u32(rdr)?;
-    return Ok(ObjectExport {
+    return Ok(Export {
       class,
       super_index,
       template,
@@ -91,12 +91,7 @@ impl ObjectExport {
     });
   }
 
-  pub fn write(
-    &self,
-    curs: &mut Cursor<Vec<u8>>,
-    names: &NameMap,
-    _imports: &ObjectImports,
-  ) -> Result<()> {
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names, _imports: &Imports) -> Result<()> {
     write_u32(curs, self.class)?;
     curs.write_i32::<LittleEndian>(self.super_index)?;
     write_u32(curs, self.template)?;
@@ -125,12 +120,12 @@ impl ObjectExport {
   }
 }
 
-impl ObjectExports {
+impl Exports {
   pub fn read(
     rdr: &mut ByteReader,
     summary: &FileSummary,
-    names: &NameMap,
-    imports: &ObjectImports,
+    names: &Names,
+    imports: &Imports,
   ) -> Result<Self> {
     if rdr.position() != summary.export_offset.into() {
       bail!(
@@ -144,7 +139,7 @@ impl ObjectExports {
     let mut export_file_offset = 0;
     for _ in 0..summary.export_count {
       let start_pos = rdr.position();
-      let mut object = ObjectExport::read(rdr, names, imports, &exports)
+      let mut object = Export::read(rdr, names, imports, &exports)
         .with_context(|| format!("Failed to parse export starting at {:#X}", start_pos))?;
 
       // Compute export_file_offset based on the size of preceeding exports
@@ -153,15 +148,10 @@ impl ObjectExports {
 
       exports.push(object);
     }
-    return Ok(ObjectExports { exports });
+    return Ok(Exports { exports });
   }
 
-  pub fn write(
-    &self,
-    curs: &mut Cursor<Vec<u8>>,
-    names: &NameMap,
-    imports: &ObjectImports,
-  ) -> Result<()> {
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names, imports: &Imports) -> Result<()> {
     for export in self.exports.iter() {
       export.write(curs, names, imports)?;
     }
@@ -179,7 +169,7 @@ impl ObjectExports {
     return None;
   }
 
-  pub fn lookup(&self, index: u64) -> Result<&ObjectExport> {
+  pub fn lookup(&self, index: u64) -> Result<&Export> {
     if index > self.exports.len() as u64 {
       bail!(
         "Export index {} is not in exports (length {})",

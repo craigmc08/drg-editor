@@ -41,7 +41,7 @@ pub struct NameVariant {
 }
 
 impl NameVariant {
-  pub fn new(name: &str, variant: u32, names: &NameMap) -> Self {
+  pub fn new(name: &str, variant: u32, names: &Names) -> Self {
     let pos = names.expect(name);
     Self {
       name_idx: pos,
@@ -52,7 +52,7 @@ impl NameVariant {
   /// Parses a string to a NameVariant
   ///
   /// Strings like SomeName_6 are turned into a NameVariant with variant = 6.
-  pub fn parse(txt: &str, names: &NameMap) -> Self {
+  pub fn parse(txt: &str, names: &Names) -> Self {
     let pieces: Vec<&str> = txt.split('_').collect();
     let len = pieces.len();
     if len > 1 {
@@ -66,7 +66,7 @@ impl NameVariant {
 
   /// Parses a string to a NameVariant, adding the name to the name list
   /// if necessary.
-  pub fn parse_and_add(txt: &str, names: &mut NameMap) -> Self {
+  pub fn parse_and_add(txt: &str, names: &mut Names) -> Self {
     let pieces: Vec<&str> = txt.split('_').collect();
     let len = pieces.len();
     // TODO refactor this to remove default value duplication
@@ -85,7 +85,7 @@ impl NameVariant {
     Self::new(txt, 0, names)
   }
 
-  pub fn read(rdr: &mut ByteReader, names: &NameMap) -> Result<Self> {
+  pub fn read(rdr: &mut ByteReader, names: &Names) -> Result<Self> {
     let start_pos = rdr.position();
     let index = rdr.read_u32::<LittleEndian>()?;
     let name = names
@@ -96,13 +96,13 @@ impl NameVariant {
     Ok(Self::new(&name, variant, names))
   }
 
-  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &NameMap) -> Result<()> {
+  pub fn write(&self, curs: &mut Cursor<Vec<u8>>, names: &Names) -> Result<()> {
     write_u32(curs, self.name_idx as u32)?;
     write_u32(curs, self.variant)?;
     Ok(())
   }
 
-  pub fn to_string(&self, names: &NameMap) -> String {
+  pub fn to_string(&self, names: &Names) -> String {
     let name = &names.names[self.name_idx];
     if self.variant == 0 {
       name.name.clone()
@@ -113,11 +113,11 @@ impl NameVariant {
 }
 
 #[derive(Debug)]
-pub struct NameMap {
+pub struct Names {
   pub names: Vec<Name>,
 }
 
-impl NameMap {
+impl Names {
   pub fn read(rdr: &mut ByteReader, summary: &FileSummary) -> Result<Self> {
     if rdr.position() != summary.name_offset.into() {
       bail!(
@@ -134,7 +134,7 @@ impl NameMap {
       name.index = i.into();
       names.push(name);
     }
-    Ok(NameMap { names })
+    Ok(Names { names })
   }
 
   pub fn write(&self, curs: &mut Cursor<Vec<u8>>) -> Result<()> {
@@ -195,13 +195,13 @@ impl NameMap {
   ///
   /// # Panics
   ///
-  /// If name is not in this NameMap.
+  /// If name is not in this Names.
   pub fn expect(&self, name: &str) -> usize {
     let name = name.to_string();
     if let Some(pos) = self.names.iter().position(|other| other.name == name) {
       pos
     } else {
-      panic!("Missing name '{}' in NameMap", name)
+      panic!("Missing name '{}' in Names", name)
     }
   }
 
