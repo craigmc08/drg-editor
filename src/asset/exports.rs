@@ -117,7 +117,7 @@ impl Export {
 
 impl Exports {
   pub fn read(rdr: &mut ByteReader, summary: &FileSummary, names: &Names) -> Result<Self> {
-    if rdr.position() != summary.export_offset.into() {
+    if rdr.position() != summary.export_offset as u64 {
       bail!(
         "Wrong exports starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
         summary.export_offset,

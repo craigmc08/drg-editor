@@ -12,7 +12,7 @@ pub struct Depends {
 
 impl Depends {
   pub fn read(rdr: &mut ByteReader, summary: &FileSummary) -> Result<Self> {
-    if rdr.position() != summary.depends_offset.into() {
+    if rdr.position() != summary.depends_offset as u64 {
       bail!(
         "Wrong depends starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
         summary.depends_offset,

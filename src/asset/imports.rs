@@ -45,7 +45,7 @@ impl Import {
 
 impl Imports {
   pub fn read(rdr: &mut ByteReader, summary: &FileSummary, name_map: &Names) -> Result<Self> {
-    if rdr.position() != summary.import_offset.into() {
+    if rdr.position() != summary.import_offset as u64 {
       bail!(
         "Wrong imports starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
         summary.import_offset,

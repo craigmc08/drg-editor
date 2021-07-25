@@ -119,7 +119,7 @@ pub struct Names {
 
 impl Names {
   pub fn read(rdr: &mut ByteReader, summary: &FileSummary) -> Result<Self> {
-    if rdr.position() != summary.name_offset.into() {
+    if rdr.position() != summary.name_offset as u64 {
       bail!(
         "Wrong name map starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
         summary.name_offset, rdr.position()

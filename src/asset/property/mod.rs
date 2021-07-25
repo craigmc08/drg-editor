@@ -9,6 +9,7 @@ mod context;
 mod loaders;
 pub mod meta;
 pub mod prop_type;
+pub mod struct_pattern;
 
 use loaders::{PropertyLoader, LOADERS};
 use meta::*;
