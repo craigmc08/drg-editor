@@ -2,6 +2,7 @@ use crate::asset::*;
 use crate::property::PropertyContext;
 use crate::property::{PropType, Property, Value};
 use crate::reader::*;
+use crate::util::read_bytes;
 use anyhow::*;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -22,7 +23,7 @@ enum StructPattern {
   },
 
   PropertyValue {
-    tag: PropType,
+    prop_type: PropType,
   },
 }
 
@@ -77,10 +78,60 @@ impl StructPattern {
         .and_then(|str| PropType::from_str(str).ok())
       {
         None => bail!("Invalid builtin tag property"),
-        Some(tag) => Ok(Self::PropertyValue { tag }),
+        Some(prop_type) => Ok(Self::PropertyValue { prop_type }),
       },
 
       Some(typ) => bail!("Unknown type property value for struct pattern '{}'", typ),
+    }
+  }
+
+  fn deserialize(&self, rdr: &mut ByteReader, ctx: PropertyContext) -> Result<StructValue> {
+    match self {
+      Self::PropertyList => {
+        let mut properties = vec![];
+        let mut i = 0;
+        'structloop: while !rdr.at_end() {
+          let start_pos = rdr.position();
+          let property = Property::deserialize(rdr, ctx)
+            .with_context(|| format!("Struct property-list[{}] at {:#X}", i, start_pos))?;
+          i += 1;
+          if let Some(property) = property {
+            properties.push(property);
+          } else {
+            break 'structloop;
+          }
+        }
+        Ok(StructValue::PropertyList { properties })
+      }
+      Self::Binary { size } => {
+        let bytes: Vec<u8> = read_bytes(rdr, *size)?;
+        Ok(StructValue::Binary { bytes })
+      }
+      Self::PropertyValue { prop_type } => {
+        let loader = Property::get_loader_for(*prop_type)?;
+        let tag = if loader.simple {
+          Tag::Simple(*prop_type)
+        } else {
+          loader.deserialize_tag(rdr, ctx)?
+        };
+        let value = loader.deserialize_value(rdr, &tag, rdr.remaining_bytes() as u64, ctx)?;
+        Ok(StructValue::PropertyValue {
+          prop_type: *prop_type,
+          tag,
+          value,
+        })
+      }
+      Self::BinaryProperties { properties } => {
+        let mut values = HashMap::default();
+        for entry in properties {
+          let value = entry
+            .pattern
+            .deserialize(rdr, ctx)
+            .with_context(|| format!("In binary-properties.{}", entry.name))?;
+          values.insert(entry.name.clone(), value);
+        }
+        Ok(StructValue::BinaryProperties { properties: values })
+      }
     }
   }
 }
@@ -101,13 +152,24 @@ pub enum StructValue {
     properties: HashMap<String, StructValue>,
   },
   PropertyValue {
+    prop_type: PropType,
+    tag: Tag,
     value: Value,
   },
 }
 
 impl StructPatterns {
-  pub fn deserialize(&self, rdr: &mut ByteReader, ctx: PropertyContext) -> Result<StructValue> {
-    panic!("Unimplemented")
+  pub fn deserialize(
+    &self,
+    rdr: &mut ByteReader,
+    struct_type: &str,
+    ctx: PropertyContext,
+  ) -> Result<StructValue> {
+    let pattern = match self.patterns.get(struct_type) {
+      None => &self.default,
+      Some(pattern) => pattern,
+    };
+    pattern.deserialize(rdr, ctx)
   }
 
   pub fn serialize(

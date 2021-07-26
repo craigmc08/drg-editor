@@ -32,6 +32,20 @@ impl ByteReader {
   pub fn position(&self) -> u64 {
     self.current as u64
   }
+
+  pub fn at_end(&self) -> bool {
+    match self.end {
+      None => false,
+      Some(end) => self.current >= end,
+    }
+  }
+
+  pub fn remaining_bytes(&self) -> usize {
+    match self.end {
+      None => self.vec.len() - self.current,
+      Some(end) => end - self.current,
+    }
+  }
 }
 
 impl Read for ByteReader {
