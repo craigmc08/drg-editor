@@ -89,6 +89,7 @@ impl StructPattern {
     match self {
       Self::PropertyList => {
         let mut properties = vec![];
+        let mut has_none = false;
         let mut i = 0;
         'structloop: while !rdr.at_end() {
           let start_pos = rdr.position();
@@ -98,10 +99,14 @@ impl StructPattern {
           if let Some(property) = property {
             properties.push(property);
           } else {
+            has_none = true;
             break 'structloop;
           }
         }
-        Ok(StructValue::PropertyList { properties })
+        Ok(StructValue::PropertyList {
+          properties,
+          has_none,
+        })
       }
       Self::Binary { size } => {
         let bytes: Vec<u8> = read_bytes(rdr, *size)?;
@@ -144,6 +149,7 @@ pub struct StructPatterns {
 pub enum StructValue {
   PropertyList {
     properties: Vec<Property>,
+    has_none: bool,
   },
   Binary {
     bytes: Vec<u8>,
@@ -156,6 +162,51 @@ pub enum StructValue {
     tag: Tag,
     value: Value,
   },
+}
+
+impl StructValue {
+  pub fn serialize(&self, curs: &mut Cursor<Vec<u8>>, ctx: PropertyContext) -> Result<()> {
+    match self {
+      Self::PropertyList {
+        properties,
+        has_none,
+      } => {
+        for property in properties {
+          property
+            .serialize(curs, ctx)
+            .with_context(|| "In struct property-list")?;
+        }
+        if *has_none {
+          let none_name = NameVariant::new("None", 0, ctx.names);
+          none_name
+            .write(curs, ctx.names)
+            .with_context(|| "Struct property-list none-terminator")?;
+        }
+        Ok(())
+      }
+      Self::Binary { bytes } => curs.write_all(bytes).with_context(|| "Struct binary data"),
+      Self::PropertyValue {
+        prop_type,
+        tag,
+        value,
+      } => {
+        let loader = Property::get_loader_for(*prop_type)?;
+        if let Tag::Simple(_) = tag {
+          loader.serialize_value(curs, value, tag, ctx)?;
+        } else {
+          loader.serialize_tag(curs, tag, ctx)?;
+          loader.serialize_value(curs, value, tag, ctx)?;
+        }
+        Ok(())
+      }
+      Self::BinaryProperties { properties } => {
+        for (_key, value) in properties.iter() {
+          value.serialize(curs, ctx)?;
+        }
+        Ok(())
+      }
+    }
+  }
 }
 
 impl StructPatterns {
@@ -178,6 +229,6 @@ impl StructPatterns {
     curs: &mut Cursor<Vec<u8>>,
     ctx: PropertyContext,
   ) -> Result<()> {
-    panic!("Unimplemented")
+    value.serialize(curs, ctx)
   }
 }
