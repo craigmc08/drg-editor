@@ -19,7 +19,10 @@ jobs:
       - uses: actions/upload-artifact@v2
         with:
           name: debug-build
-          path: target/debug/drg-editor.exe
+          path: |
+            target/debug/drg-editor.exe
+            target/debug/drg-cli.exe
+            data/
 
   test:
     name: Test Suite
