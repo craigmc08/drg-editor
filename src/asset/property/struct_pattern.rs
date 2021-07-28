@@ -8,11 +8,15 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::str::FromStr;
 
+pub static mut STRUCT_PATTERNS: Option<StructPatterns> = None;
+
+#[derive(Debug)]
 struct BinaryPropertyPattern {
   name: String,
   pattern: StructPattern,
 }
 
+#[derive(Debug)]
 enum StructPattern {
   PropertyList,
   Binary {
@@ -73,12 +77,10 @@ impl StructPattern {
         }
       },
 
-      Some("builtin") => match val["tag"]
-        .as_str()
-        .and_then(|str| PropType::from_str(str).ok())
-      {
-        None => bail!("Invalid builtin tag property"),
-        Some(prop_type) => Ok(Self::PropertyValue { prop_type }),
+      Some("builtin") => match val["tag"].as_str().map(|str| PropType::from_str(str)) {
+        None => bail!("Invalid builtin 'tag' property type"),
+        Some(Err(err)) => bail!(err),
+        Some(Ok(prop_type)) => Ok(Self::PropertyValue { prop_type }),
       },
 
       Some(typ) => bail!("Unknown type property value for struct pattern '{}'", typ),
@@ -141,11 +143,13 @@ impl StructPattern {
   }
 }
 
+#[derive(Debug)]
 pub struct StructPatterns {
   default: StructPattern,
   patterns: HashMap<String, StructPattern>,
 }
 
+#[derive(Debug)]
 pub enum StructValue {
   PropertyList {
     properties: Vec<Property>,
@@ -237,6 +241,19 @@ impl StructPatterns {
     let contents = std::fs::read_to_string(fp)?;
     let json: JsonValue = serde_json::from_str(&contents)?;
     Self::from_json(&json)
+  }
+
+  /// Loads struct patterns from fp into static instance, get it with `StructPatterns::get()`
+  pub fn load(fp: &Path) -> Result<()> {
+    let instance = Self::from_file(fp)?;
+    unsafe {
+      STRUCT_PATTERNS = Some(instance);
+    }
+    Ok(())
+  }
+
+  pub fn get() -> Option<&'static Self> {
+    unsafe { STRUCT_PATTERNS.as_ref() }
   }
 
   pub fn deserialize(

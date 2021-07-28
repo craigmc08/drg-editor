@@ -28,7 +28,7 @@
         {
           "name": "Alpha",
           "type": "builtin",
-          "tag": "Uint8Property"
+          "tag": "UInt8Property"
         }
       ]
     }

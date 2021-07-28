@@ -181,6 +181,7 @@ impl AssetExports {
       &header.names,
       &header.imports,
       &header.exports,
+      struct_pattern::StructPatterns::get().expect("struct-patterns was not initialized properly"),
     );
     for export in header.exports.exports.iter() {
       let start_pos = cursor_uexp.position();
@@ -198,6 +199,7 @@ impl AssetExports {
       &header.names,
       &header.imports,
       &header.exports,
+      struct_pattern::StructPatterns::get().expect("struct-patterns was not initialized properly"),
     );
     for (i, strct) in self.structs.iter().enumerate() {
       strct.serialize(&mut cursor, ctx).with_context(|| {

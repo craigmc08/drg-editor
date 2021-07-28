@@ -23,7 +23,13 @@ fn main() {
   )
   .get_matches();
 
-  let data_dir = matches.value_of("DATA").unwrap_or("./data");
+  let data_dir: &Path = matches.value_of("DATA").unwrap_or("./data").as_ref();
+  let struct_pattern_file = data_dir.join("struct-patterns.json");
+  if let Err(err) = struct_pattern::StructPatterns::load(&struct_pattern_file) {
+    println!("Failed to load struct patterns: {:?}", err);
+    std::process::exit(-1);
+  }
+
   if let Some(asset_loc) = matches.value_of("ASSET") {
     start_editor_with_path(asset_loc.as_ref());
   } else {

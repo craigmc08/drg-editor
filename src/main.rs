@@ -39,7 +39,12 @@ fn main() {
     )
   ).get_matches();
 
-  let data_dir = matches.value_of("DATA").unwrap_or("./data");
+  let data_dir: &Path = matches.value_of("DATA").unwrap_or("./data").as_ref();
+  let struct_pattern_file = data_dir.join("struct-patterns.json");
+  if let Err(err) = struct_pattern::StructPatterns::load(&struct_pattern_file) {
+    println!("Failed to load struct patterns: {:?}", err);
+    std::process::exit(-1);
+  }
 
   if let Some(matches) = matches.subcommand_matches("gui") {
     if let Some(asset_loc) = matches.value_of("ASSET") {
