@@ -2,7 +2,6 @@
 
 #[macro_use]
 extern crate clap;
-use clap::App;
 
 mod asset;
 mod bindings;

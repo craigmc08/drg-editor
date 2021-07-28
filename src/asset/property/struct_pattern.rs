@@ -211,6 +211,33 @@ impl StructValue {
       }
     }
   }
+
+  pub fn byte_size(&self) -> usize {
+    match self {
+      Self::PropertyList {
+        properties,
+        has_none,
+      } => {
+        let none_size = if *has_none { 8 } else { 0 };
+        properties
+          .iter()
+          .map(|prop| prop.byte_size())
+          .sum::<usize>()
+          + none_size
+      }
+      Self::Binary { bytes } => bytes.len(),
+      Self::BinaryProperties { properties } => properties.iter().map(|(_, v)| v.byte_size()).sum(),
+      Self::PropertyValue {
+        prop_type,
+        tag,
+        value,
+      } => {
+        // Since a loader must exist to make this value, this should never fail
+        let loader = Property::get_loader_for(*prop_type).unwrap();
+        loader.tag_size(tag) + loader.value_size(value, tag)
+      }
+    }
+  }
 }
 
 impl StructPatterns {

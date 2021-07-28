@@ -2,7 +2,6 @@
 
 #[macro_use]
 extern crate clap;
-use clap::App;
 
 mod asset;
 mod bindings;
@@ -10,9 +9,10 @@ mod editor;
 mod reader;
 mod util;
 
+use anyhow::*;
 use asset::*;
 use editor::*;
-use std::fs::File;
+use rayon::iter::*;
 use std::io::prelude::*;
 use std::io::BufWriter;
 use std::path::*;
@@ -66,10 +66,16 @@ fn main() {
 }
 
 fn test_command(out_file: &str, asset_loc: &str) {
+  if let Err(err) = Asset::test_rw(asset_loc.as_ref()) {
+    println!("Error testing r/w of asset");
+    println!("{:?}", err);
+  }
+
   match &mut Asset::read_from(asset_loc.as_ref()) {
     Err(err) => {
       println!("Failed to read asset");
       println!("{:?}", err);
+      std::process::exit(-1);
     }
     Ok(asset) => {
       asset.recalculate_offsets();
@@ -82,44 +88,67 @@ fn test_command(out_file: &str, asset_loc: &str) {
 }
 
 fn all_command(out_file: Option<&str>, dir: &str) {
+  let show_info = out_file.is_some();
+
+  let asset_locs: Vec<PathBuf> = WalkDir::new(dir.clone())
+    .into_iter()
+    .map(|entry| entry.unwrap().into_path())
+    .filter(|fp| fp.extension() == Some("uasset".as_ref()))
+    .collect();
+
+  let total = asset_locs.len();
+  if show_info {
+    println!("Number of assets: {}", total);
+  }
+
+  let mut results: Vec<(PathBuf, Result<()>)> = vec![];
+  asset_locs
+    .into_par_iter()
+    .enumerate()
+    .map(|(i, fp)| {
+      if i % 1000 == 0 && show_info {
+        println!("Processed {}/{} assets", i, total);
+      }
+      (fp.clone(), Asset::test_rw(fp.as_ref()))
+    })
+    .collect_into_vec(&mut results);
+
   let mut out_stream = if let Some(out_file) = out_file {
     BufWriter::new(Box::new(std::fs::File::create(out_file).unwrap()) as Box<dyn Write>)
   } else {
     BufWriter::new(Box::new(std::io::stdout()) as Box<dyn Write>)
   };
 
-  let mut total = 0;
-  let mut failed = 0;
-  for (steps, entry) in WalkDir::new(dir.clone()).into_iter().enumerate() {
-    if steps % 1000 == 0 {
-      println!(
-        "Processed {} entries ({}/{} are assets)",
-        steps, total, steps
-      );
+  results.iter().for_each(|(fp, result)| match result {
+    Err(err) => {
+      writeln!(
+        &mut out_stream,
+        "ASSET {}\nFAILURE\n{:?}\n====================",
+        fp.display(),
+        err
+      )
+      .unwrap();
     }
-
-    let entry = entry.unwrap();
-    let fp = entry.path();
-    if fp.extension() == Some("uasset".as_ref()) {
-      total += 1;
-      match &mut Asset::read_from(fp) {
-        Err(err) => {
-          failed += 1;
-          writeln!(&mut out_stream, "FAILED {}: {:?}", fp.display(), err).unwrap();
-        }
-        Ok(_) => {
-          writeln!(&mut out_stream, "SUCCESS {}", fp.display()).unwrap();
-        }
-      }
+    Ok(_) => {
+      writeln!(
+        &mut out_stream,
+        "ASSET {}\nSUCCESS\n====================",
+        fp.display()
+      )
+      .unwrap();
     }
-  }
+  });
 
+  let success_count = results
+    .iter()
+    .filter(|(entry, result)| result.is_ok())
+    .count();
   writeln!(
     &mut out_stream,
-    "\n{}% failed ({}/{})",
-    (failed as f32) / (total as f32) * 100.0,
-    failed,
-    total
+    "TOTAL\nSUCCESS {} of {}\nPERCENT {}%",
+    success_count,
+    total,
+    (success_count as f32) / (total as f32)
   )
   .unwrap();
 }
