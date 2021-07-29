@@ -3,6 +3,7 @@ extern crate clap;
 
 use anyhow::*;
 use drg::*;
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::iter::*;
 use std::io::prelude::*;
 use std::io::BufWriter;
@@ -69,8 +70,6 @@ fn test_command(out_file: &str, asset_loc: &str) {
 }
 
 fn all_command(out_file: Option<&str>, dir: &str) {
-  let show_info = out_file.is_some();
-
   let asset_locs: Vec<PathBuf> = WalkDir::new(dir.clone())
     .into_iter()
     .map(|entry| entry.unwrap().into_path())
@@ -78,21 +77,19 @@ fn all_command(out_file: Option<&str>, dir: &str) {
     .collect();
 
   let total = asset_locs.len();
-  if show_info {
-    println!("Number of assets: {}", total);
-  }
 
-  let mut results: Vec<(PathBuf, Result<()>)> = vec![];
-  asset_locs
-    .into_par_iter()
+  let pb = ProgressBar::new(total as u64);
+  pb.set_style(
+    ProgressStyle::default_bar()
+      .template("[{elapsed_precise}] {bar:40.cyan/blue} {pos:>7}/{len:7} {msg}")
+      .progress_chars("=>-"),
+  );
+  let results: Vec<(PathBuf, Result<()>)> = asset_locs
+    .par_iter()
+    .progress_with(pb)
     .enumerate()
-    .map(|(i, fp)| {
-      if i % 1000 == 0 && show_info {
-        println!("Processed {}/{} assets", i, total);
-      }
-      (fp.clone(), Asset::test_rw(fp.as_ref()))
-    })
-    .collect_into_vec(&mut results);
+    .map(|(i, fp)| (fp.clone(), Asset::test_rw(fp.as_ref())))
+    .collect();
 
   let mut out_stream = if let Some(out_file) = out_file {
     BufWriter::new(Box::new(std::fs::File::create(out_file).unwrap()) as Box<dyn Write>)
