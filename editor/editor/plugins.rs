@@ -1,8 +1,8 @@
-use crate::asset::property::meta::*;
-use crate::asset::property::prop_type::*;
-use crate::asset::*;
-use crate::bindings::*;
 use crate::editor::internal::*;
+use drg::asset::property::meta::*;
+use drg::asset::property::prop_type::*;
+use drg::asset::*;
+use drg::bindings::*;
 
 use imgui::*;
 

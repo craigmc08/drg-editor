@@ -3,13 +3,9 @@
 #[macro_use]
 extern crate clap;
 
-mod asset;
-mod bindings;
 mod editor;
-mod reader;
-mod util;
 
-use asset::*;
+use drg::asset::*;
 use editor::*;
 use std::path::*;
 

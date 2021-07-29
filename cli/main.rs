@@ -1,17 +1,8 @@
-// #![windows_subsystem = "windows"]
-
 #[macro_use]
 extern crate clap;
 
-mod asset;
-mod bindings;
-mod editor;
-mod reader;
-mod util;
-
 use anyhow::*;
-use asset::*;
-use editor::*;
+use drg::*;
 use rayon::iter::*;
 use std::io::prelude::*;
 use std::io::BufWriter;
@@ -23,10 +14,6 @@ fn main() {
     (version: "0.1.0")
     (author: "Craig M. <craigmc08@gmail.com>")
     (@arg DATA: -d --data +takes_value "Directory for config files; default: ./data")
-    (@subcommand gui =>
-      (about: "Open graphical editor")
-      (@arg ASSET: +takes_value "Asset to open; if not present, no asset is opened")
-    )
     (@subcommand test =>
       (about: "Deserializes and serializes a single asset file")
       (@arg OUT: -o --out +takes_value "Filename to serialize asset to; default: ./out/out.[uasset/uexp]")
@@ -46,13 +33,7 @@ fn main() {
     std::process::exit(-1);
   }
 
-  if let Some(matches) = matches.subcommand_matches("gui") {
-    if let Some(asset_loc) = matches.value_of("ASSET") {
-      start_editor_with_path(asset_loc.as_ref());
-    } else {
-      start_editor_empty();
-    }
-  } else if let Some(matches) = matches.subcommand_matches("test") {
+  if let Some(matches) = matches.subcommand_matches("test") {
     let out_file = matches.value_of("OUT").unwrap_or("./out/out");
     let asset_loc = matches.value_of("ASSET").unwrap();
     test_command(out_file, asset_loc);
@@ -141,7 +122,7 @@ fn all_command(out_file: Option<&str>, dir: &str) {
 
   let success_count = results
     .iter()
-    .filter(|(entry, result)| result.is_ok())
+    .filter(|(_fp, result)| result.is_ok())
     .count();
   writeln!(
     &mut out_stream,

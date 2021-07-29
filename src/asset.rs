@@ -258,11 +258,11 @@ impl Asset {
     let (uasset_out, uexp_out) = asset.write()?;
 
     if uasset.len() != uasset_out.len() {
-      return bail!(
+      bail!(
         "Different uasset length after writing: {:04X} to {:04X}",
         uasset.len(),
         uasset_out.len()
-      );
+      )
     }
     if uexp.len() != uexp_out.len() {
       bail!(
