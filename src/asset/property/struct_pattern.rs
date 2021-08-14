@@ -1,12 +1,13 @@
 use crate::asset::*;
+use crate::property::Property;
 use crate::property::PropertyContext;
-use crate::property::{PropType, Property, Value};
 use crate::reader::*;
 use crate::util::read_bytes;
 use anyhow::*;
+use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
-use std::str::FromStr;
+use std::convert::TryInto;
 
 pub static mut STRUCT_PATTERNS: Option<StructPatterns> = None;
 
@@ -26,8 +27,14 @@ enum StructPattern {
     properties: Vec<BinaryPropertyPattern>,
   },
 
-  PropertyValue {
-    prop_type: PropType,
+  Int {
+    size: u8,
+  },
+  UInt {
+    size: u8,
+  },
+  Floating {
+    size: u8,
   },
 }
 
@@ -49,6 +56,18 @@ impl BinaryPropertyPattern {
 }
 
 impl StructPattern {
+  fn read_numeric_size(typ: &str) -> Result<u8> {
+    let size: u8 = typ[1..].parse()?;
+    if size != 8 && size != 16 && size != 32 && size != 64 {
+      bail!(
+        "Invalid size for numeric pattern {}. Must be 8, 16, 32, or 64",
+        size
+      );
+    } else {
+      Ok(size)
+    }
+  }
+
   fn from_json(val: &JsonValue) -> Result<Self> {
     match val["type"].as_str() {
       None => bail!("Missing type property in struct pattern"),
@@ -77,13 +96,23 @@ impl StructPattern {
         }
       },
 
-      Some("builtin") => match val["tag"].as_str().map(|str| PropType::from_str(str)) {
-        None => bail!("Invalid builtin 'tag' property type"),
-        Some(Err(err)) => bail!(err),
-        Some(Ok(prop_type)) => Ok(Self::PropertyValue { prop_type }),
-      },
-
-      Some(typ) => bail!("Unknown type property value for struct pattern '{}'", typ),
+      Some(typ) => {
+        if &typ[0..1] == "i" {
+          Ok(Self::Int {
+            size: Self::read_numeric_size(typ)?,
+          })
+        } else if &typ[0..1] == "u" {
+          Ok(Self::UInt {
+            size: Self::read_numeric_size(typ)?,
+          })
+        } else if &typ[0..1] == "f" {
+          Ok(Self::Floating {
+            size: Self::read_numeric_size(typ)?,
+          })
+        } else {
+          bail!("Unknown type property value for struct pattern '{}'", typ)
+        }
+      }
     }
   }
 
@@ -114,19 +143,33 @@ impl StructPattern {
         let bytes: Vec<u8> = read_bytes(rdr, *size)?;
         Ok(StructValue::Binary { bytes })
       }
-      Self::PropertyValue { prop_type } => {
-        let loader = Property::get_loader_for(*prop_type)?;
-        let tag = if loader.simple {
-          Tag::Simple(*prop_type)
-        } else {
-          loader.deserialize_tag(rdr, ctx)?
+      Self::Int { size } => {
+        let value: i64 = match size {
+          8 => rdr.read_i8()?.into(),
+          16 => rdr.read_i16::<LittleEndian>()?.into(),
+          32 => rdr.read_i32::<LittleEndian>()?.into(),
+          64 => rdr.read_i64::<LittleEndian>()?.into(),
+          _ => bail!("Invalid size {} for Int pattern", size),
         };
-        let value = loader.deserialize_value(rdr, &tag, rdr.remaining_bytes() as u64, ctx)?;
-        Ok(StructValue::PropertyValue {
-          prop_type: *prop_type,
-          tag,
-          value,
-        })
+        Ok(StructValue::Int { size: *size, value })
+      }
+      Self::UInt { size } => {
+        let value: u64 = match size {
+          8 => rdr.read_u8()?.into(),
+          16 => rdr.read_u16::<LittleEndian>()?.into(),
+          32 => rdr.read_u32::<LittleEndian>()?.into(),
+          64 => rdr.read_u64::<LittleEndian>()?.into(),
+          _ => bail!("Invalid size {} for UInt pattern", size),
+        };
+        Ok(StructValue::UInt { size: *size, value })
+      }
+      Self::Floating { size } => {
+        let value: f64 = match size {
+          32 => rdr.read_f32::<LittleEndian>()?.into(),
+          64 => rdr.read_f64::<LittleEndian>()?.into(),
+          _ => bail!("Invalid size {} for Floating pattern", size),
+        };
+        Ok(StructValue::Floating { size: *size, value })
       }
       Self::BinaryProperties { properties } => {
         let mut values = HashMap::default();
@@ -161,10 +204,18 @@ pub enum StructValue {
   BinaryProperties {
     properties: HashMap<String, StructValue>,
   },
-  PropertyValue {
-    prop_type: PropType,
-    tag: Tag,
-    value: Value,
+
+  Int {
+    size: u8,
+    value: i64,
+  },
+  UInt {
+    size: u8,
+    value: u64,
+  },
+  Floating {
+    size: u8,
+    value: f64,
   },
 }
 
@@ -189,23 +240,37 @@ impl StructValue {
         Ok(())
       }
       Self::Binary { bytes } => curs.write_all(bytes).with_context(|| "Struct binary data"),
-      Self::PropertyValue {
-        prop_type,
-        tag,
-        value,
-      } => {
-        let loader = Property::get_loader_for(*prop_type)?;
-        if let Tag::Simple(_) = tag {
-          loader.serialize_value(curs, value, tag, ctx)?;
-        } else {
-          loader.serialize_tag(curs, tag, ctx)?;
-          loader.serialize_value(curs, value, tag, ctx)?;
-        }
-        Ok(())
-      }
       Self::BinaryProperties { properties } => {
         for (_key, value) in properties.iter() {
           value.serialize(curs, ctx)?;
+        }
+        Ok(())
+      }
+      Self::Int { size, value } => {
+        match size {
+          8 => curs.write_i8((*value).try_into()?)?,
+          16 => curs.write_i16::<LittleEndian>((*value).try_into()?)?,
+          32 => curs.write_i32::<LittleEndian>((*value).try_into()?)?,
+          64 => curs.write_i64::<LittleEndian>((*value).try_into()?)?,
+          _ => unreachable!(),
+        }
+        Ok(())
+      }
+      Self::UInt { size, value } => {
+        match size {
+          8 => curs.write_u8((*value).try_into()?)?,
+          16 => curs.write_u16::<LittleEndian>((*value).try_into()?)?,
+          32 => curs.write_u32::<LittleEndian>((*value).try_into()?)?,
+          64 => curs.write_u64::<LittleEndian>((*value).try_into()?)?,
+          _ => unreachable!(),
+        }
+        Ok(())
+      }
+      Self::Floating { size, value } => {
+        match size {
+          32 => curs.write_f32::<LittleEndian>(*value as f32)?,
+          64 => curs.write_f64::<LittleEndian>(*value)?,
+          _ => unreachable!(),
         }
         Ok(())
       }
@@ -227,15 +292,9 @@ impl StructValue {
       }
       Self::Binary { bytes } => bytes.len(),
       Self::BinaryProperties { properties } => properties.iter().map(|(_, v)| v.byte_size()).sum(),
-      Self::PropertyValue {
-        prop_type,
-        tag,
-        value,
-      } => {
-        // Since a loader must exist to make this value, this should never fail
-        let loader = Property::get_loader_for(*prop_type).unwrap();
-        loader.tag_size(tag) + loader.value_size(value, tag)
-      }
+      Self::Int { size, .. } => *size as usize,
+      Self::UInt { size, .. } => *size as usize,
+      Self::Floating { size, .. } => *size as usize,
     }
   }
 }
