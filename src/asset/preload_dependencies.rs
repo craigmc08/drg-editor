@@ -18,7 +18,7 @@ impl PreloadDependencies {
     imports: &Imports,
     exports: &Exports,
   ) -> Result<Self> {
-    if rdr.position() != summary.preload_dependency_offset.into() {
+    if rdr.position() != summary.preload_dependency_offset as u64 {
       bail!(
         "Wrong preload dependencies position: Expected to be at position {:#X}, but I'm at position {:#X}",
         summary.preload_dependency_offset,

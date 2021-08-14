@@ -8,6 +8,7 @@ use strum_macros::{Display, EnumString};
 #[derive(Debug, Clone, Copy, PartialEq, Display, EnumString)]
 pub enum PropType {
   IntProperty,
+  UInt8Property,
   FloatProperty,
   ObjectProperty,
   SoftObjectProperty,

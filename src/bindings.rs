@@ -114,7 +114,7 @@ impl AssetHeader {
   ///
   /// # Examples
   ///
-  /// ```
+  /// ```ignore
   /// asset.import("/Script/CoreUObject", "Package", "/Game/WeaponsNTools/GrapplingGun/ID_GrapplingGun", Reference::UObject);
   /// asset.import("/Script/FSD", "ItemID", "ID_GrapplingGun", Reference::Import("/Game/WeaponsNTools/GrapplingGun/ID_Grappling");
   /// ```

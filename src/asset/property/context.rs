@@ -1,4 +1,5 @@
 use crate::asset::*;
+use crate::struct_pattern::*;
 
 #[derive(Debug, Clone, Copy)]
 pub struct PropertyContext<'a> {
@@ -6,6 +7,7 @@ pub struct PropertyContext<'a> {
   pub names: &'a Names,
   pub imports: &'a Imports,
   pub exports: &'a Exports,
+  pub patterns: &'a StructPatterns,
 }
 
 impl<'a> PropertyContext<'a> {
@@ -14,12 +16,14 @@ impl<'a> PropertyContext<'a> {
     names: &'a Names,
     imports: &'a Imports,
     exports: &'a Exports,
+    patterns: &'a StructPatterns,
   ) -> Self {
     Self {
       summary,
       names,
       imports,
       exports,
+      patterns,
     }
   }
 }

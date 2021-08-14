@@ -181,6 +181,7 @@ impl AssetExports {
       &header.names,
       &header.imports,
       &header.exports,
+      struct_pattern::StructPatterns::get().expect("struct-patterns was not initialized properly"),
     );
     for export in header.exports.exports.iter() {
       let start_pos = cursor_uexp.position();
@@ -198,6 +199,7 @@ impl AssetExports {
       &header.names,
       &header.imports,
       &header.exports,
+      struct_pattern::StructPatterns::get().expect("struct-patterns was not initialized properly"),
     );
     for (i, strct) in self.structs.iter().enumerate() {
       strct.serialize(&mut cursor, ctx).with_context(|| {
@@ -239,6 +241,48 @@ impl Asset {
 
     std::fs::write(uasset_fp, uasset)?;
     std::fs::write(uexp_fp, uexp)?;
+
+    Ok(())
+  }
+
+  pub fn test_rw(asset_loc: &Path) -> Result<()> {
+    let uasset_fp = asset_loc.with_extension("uasset");
+    let uexp_fp = asset_loc.with_extension("uexp");
+
+    let uasset = std::fs::read(uasset_fp.clone())
+      .with_context(|| format!("Failed to read uasset from {:?}", uasset_fp))?;
+    let uexp = std::fs::read(uexp_fp.clone())
+      .with_context(|| format!("Failed to read uasset from {:?}", uexp_fp))?;
+
+    let asset = Self::read(uasset.clone(), uexp.clone())?;
+    let (uasset_out, uexp_out) = asset.write()?;
+
+    if uasset.len() != uasset_out.len() {
+      bail!(
+        "Different uasset length after writing: {:04X} to {:04X}",
+        uasset.len(),
+        uasset_out.len()
+      )
+    }
+    if uexp.len() != uexp_out.len() {
+      bail!(
+        "Different uexo length after writing: {:04X} to {:04X}",
+        uexp.len(),
+        uexp_out.len()
+      )
+    }
+
+    for (i, (b1, b2)) in uasset.iter().zip(uasset_out.iter()).enumerate() {
+      if b1 != b2 {
+        bail!("Different byte in uasset after writing at {:04X}", i);
+      }
+    }
+
+    for (i, (b1, b2)) in uexp.iter().zip(uexp_out.iter()).enumerate() {
+      if b1 != b2 {
+        bail!("Different byte in uexp after writing at {:04X}", i);
+      }
+    }
 
     Ok(())
   }

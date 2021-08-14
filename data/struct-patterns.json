@@ -1,0 +1,36 @@
+{
+  "default": {
+    "type": "property-list"
+  },
+  "patterns": {
+    "Box": {
+      "type": "binary",
+      "size": 25
+    },
+    "Color": {
+      "type": "binary-properties",
+      "properties": [
+        {
+          "name": "Red",
+          "type": "builtin",
+          "tag": "UInt8Property"
+        },
+        {
+          "name": "Green",
+          "type": "builtin",
+          "tag": "UInt8Property"
+        },
+        {
+          "name": "Blue",
+          "type": "builtin",
+          "tag": "UInt8Property"
+        },
+        {
+          "name": "Alpha",
+          "type": "builtin",
+          "tag": "UInt8Property"
+        }
+      ]
+    }
+  }
+}

@@ -13,7 +13,7 @@ pub struct AssetRegistry {
 impl AssetRegistry {
   pub fn read(rdr: &mut ByteReader, summary: &FileSummary) -> Result<Self> {
     // Asset registry actually contains both Depends and AssetsRegistry
-    if rdr.position() != summary.asset_registry_data_offset.into() {
+    if rdr.position() != summary.asset_registry_data_offset as u64 {
       bail!(
         "Wrong asset registry starting position: Expected to be at position {:#X}, but I'm at position {:#X}",
         summary.depends_offset,

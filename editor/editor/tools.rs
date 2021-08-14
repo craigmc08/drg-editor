@@ -1,8 +1,8 @@
-use crate::asset::*;
 use crate::editor::internal::*;
 use crate::editor::keyboard::*;
 use crate::editor::operations::*;
 use crate::operation;
+use drg::asset::*;
 use imgui::*;
 use winit::event::VirtualKeyCode;
 
@@ -23,7 +23,7 @@ impl ToolEditor {
   ///
   /// # Example
   ///
-  /// ```
+  /// ```ignore
   /// if let Some(edit_menu) = ui.begin_menu("Edit", true) {
   ///   if let Some(tool_editor) = ToolEditor::menu_items(editor, ui) {
   ///     editor.tool = Some(tool_editor)
