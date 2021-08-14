@@ -38,12 +38,10 @@ fn main() {
     let out_file = matches.value_of("OUT").unwrap_or("./out/out");
     let asset_loc = matches.value_of("ASSET").unwrap();
     test_command(out_file, asset_loc);
-    return;
   } else if let Some(matches) = matches.subcommand_matches("all") {
     let out_file = matches.value_of("OUT");
     let dir = matches.value_of("DIRECTORY").unwrap();
     all_command(out_file, dir);
-    return;
   }
 }
 
@@ -70,7 +68,7 @@ fn test_command(out_file: &str, asset_loc: &str) {
 }
 
 fn all_command(out_file: Option<&str>, dir: &str) {
-  let asset_locs: Vec<PathBuf> = WalkDir::new(dir.clone())
+  let asset_locs: Vec<PathBuf> = WalkDir::new(dir)
     .into_iter()
     .map(|entry| entry.unwrap().into_path())
     .filter(|fp| fp.extension() == Some("uasset".as_ref()))
@@ -87,8 +85,7 @@ fn all_command(out_file: Option<&str>, dir: &str) {
   let results: Vec<(PathBuf, Result<()>)> = asset_locs
     .par_iter()
     .progress_with(pb)
-    .enumerate()
-    .map(|(i, fp)| (fp.clone(), Asset::test_rw(fp.as_ref())))
+    .map(|fp| (fp.clone(), Asset::test_rw(fp.as_ref())))
     .collect();
 
   let mut out_stream = if let Some(out_file) = out_file {

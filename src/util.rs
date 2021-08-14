@@ -8,7 +8,7 @@ use std::io::{Seek, SeekFrom};
 ///
 /// A common use would be to read n bytes to an n-length slice, ex:
 ///
-/// ```
+/// ```ignore
 /// let guid: [u8; 16] = read_bytes(rdr, 16);
 /// ```
 ///

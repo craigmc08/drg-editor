@@ -23,7 +23,7 @@ impl ToolEditor {
   ///
   /// # Example
   ///
-  /// ```
+  /// ```ignore
   /// if let Some(edit_menu) = ui.begin_menu("Edit", true) {
   ///   if let Some(tool_editor) = ToolEditor::menu_items(editor, ui) {
   ///     editor.tool = Some(tool_editor)
