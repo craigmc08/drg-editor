@@ -12,23 +12,19 @@
       "properties": [
         {
           "name": "Red",
-          "type": "builtin",
-          "tag": "UInt8Property"
+          "type": "u8"
         },
         {
           "name": "Green",
-          "type": "builtin",
-          "tag": "UInt8Property"
+          "type": "u8"
         },
         {
           "name": "Blue",
-          "type": "builtin",
-          "tag": "UInt8Property"
+          "type": "u8"
         },
         {
           "name": "Alpha",
-          "type": "builtin",
-          "tag": "UInt8Property"
+          "type": "u8"
         }
       ]
     }

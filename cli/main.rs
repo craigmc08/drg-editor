@@ -123,7 +123,7 @@ fn all_command(out_file: Option<&str>, dir: &str) {
     "TOTAL\nSUCCESS {} of {}\nPERCENT {}%",
     success_count,
     total,
-    (success_count as f32) / (total as f32)
+    (success_count as f32) / (total as f32) * 100.
   )
   .unwrap();
 }

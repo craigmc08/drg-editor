@@ -1,3 +1,4 @@
+use crate::asset::struct_pattern::*;
 use crate::asset::*;
 use crate::reader::*;
 use crate::util::*;
@@ -44,7 +45,7 @@ pub enum Value {
     values: Vec<Value>,
   },
   Struct {
-    properties: Vec<Property>,
+    value: StructValue,
   },
   RawData {
     data: Vec<u8>,
