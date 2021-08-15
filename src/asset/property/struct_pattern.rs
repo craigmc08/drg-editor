@@ -192,7 +192,7 @@ pub struct StructPatterns {
   patterns: HashMap<String, StructPattern>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StructValue {
   PropertyList {
     properties: Vec<Property>,
