@@ -1,5 +1,6 @@
 use crate::asset::property::context::*;
 use crate::asset::property::loaders::PropertyLoader;
+use crate::asset::property::meta::*;
 use crate::asset::property::prop_type::*;
 use crate::asset::*;
 use crate::loader;
@@ -57,7 +58,25 @@ fn deserialize_array(
           .with_context(|| format!("Array[{}]", i))?;
         values.push(value);
       }
-      Ok(Value::Array { values })
+      Ok(Value::Array {
+        meta_tag: None,
+        values,
+      })
+    } else if *inner_type == PropType::StructProperty {
+      let count = rdr.read_u32::<LittleEndian>()?;
+      let meta = Meta::deserialize(rdr, ctx)?.ok_or(anyhow!("Invalid meta tag for array value"))?;
+      let inner_tag = loader.deserialize_tag(rdr, ctx)?;
+      rdr.read_exact(&mut [0])?;
+      let mut values = vec![];
+      for i in 0..count {
+        let value = (loader.deserialize_value)(rdr, &inner_tag, max_size, ctx)
+          .with_context(|| format!("Array[{}]", i))?;
+        values.push(value);
+      }
+      Ok(Value::Array {
+        meta_tag: Some((meta, inner_tag)),
+        values,
+      })
     } else {
       let data: Vec<u8> = read_bytes(rdr, max_size as usize)?;
       Ok(Value::RawData { data })
@@ -76,11 +95,20 @@ fn serialize_array(
   ctx: PropertyContext,
 ) -> Result<()> {
   match (val, tag) {
-    (Value::Array { values }, Tag::Array { inner_type }) => {
-      let inner_tag = Tag::Simple(*inner_type);
+    (Value::Array { meta_tag, values }, Tag::Array { inner_type }) => {
       let loader = Property::get_loader_for(*inner_type).with_context(|| "Array.inner_type")?;
       let len = values.len();
       curs.write_u32::<LittleEndian>(len as u32)?;
+
+      let inner_tag = match meta_tag {
+        None => Tag::Simple(*inner_type),
+        Some((meta, tag)) => {
+          meta.serialize(curs, ctx)?;
+          loader.serialize_tag(curs, tag, ctx)?;
+          curs.write_all(&[0])?;
+          tag.clone()
+        }
+      };
       for (i, value) in values.iter().enumerate() {
         loader
           .serialize_value(curs, value, &inner_tag, ctx)
@@ -102,14 +130,22 @@ fn serialize_array(
 /// Panics if value is not Array or RawData or Tag is not Array
 fn value_size_array(value: &Value, tag: &Tag) -> usize {
   match (value, tag) {
-    (Value::Array { values }, Tag::Array { inner_type }) => {
-      let inner_tag = Tag::Simple(*inner_type);
+    (Value::Array { meta_tag, values }, Tag::Array { inner_type }) => {
+      let inner_tag = meta_tag
+        .as_ref()
+        .map(|(_, tag)| tag.clone())
+        .unwrap_or_else(|| Tag::Simple(*inner_type));
       let loader = Property::get_loader_for(*inner_type).expect("Unreachable");
+      let meta_tag_size = if let Some((meta, tag)) = meta_tag {
+        meta.byte_size() + loader.tag_size(tag) + 1
+      } else {
+        0
+      };
       let values_size = values
         .iter()
         .map(|v| (loader.value_size)(v, &inner_tag))
         .sum::<usize>();
-      4 + values_size
+      4 + meta_tag_size + values_size
     }
     (Value::RawData { data }, _) => data.len(),
     _ => {

@@ -268,7 +268,10 @@ where
   }
   fn as_value(&self) -> Value {
     let values: Vec<Value> = self.iter().map(|t| t.as_value()).collect();
-    Value::Array { values }
+    Value::Array {
+      meta_tag: None,
+      values,
+    }
   }
 }
 impl<T> FromValue for Vec<T>
@@ -277,7 +280,7 @@ where
 {
   fn from_value(value: &Value) -> Option<Self> {
     match &value {
-      Value::Array { values } => Some(values.iter().filter_map(|v| T::from_value(v)).collect()),
+      Value::Array { values, .. } => Some(values.iter().filter_map(|v| T::from_value(v)).collect()),
       _ => None,
     }
   }

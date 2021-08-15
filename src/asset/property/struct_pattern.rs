@@ -36,6 +36,9 @@ enum StructPattern {
   Floating {
     size: u8,
   },
+  Enum {
+    variants: Vec<String>,
+  },
 }
 
 impl BinaryPropertyPattern {
@@ -100,6 +103,18 @@ impl StructPattern {
             .collect::<Result<Vec<BinaryPropertyPattern>>>()
             .with_context(|| "In binary-properties")?;
           Ok(Self::BinaryProperties { properties })
+        }
+      },
+
+      Some("enum") => match val["variants"].as_array() {
+        None => bail!("Missing variants property in struct pattern of type 'enum'"),
+        Some(variants) => {
+          let variants = variants
+            .iter()
+            .map(|v| v.as_str().map(std::string::ToString::to_string))
+            .collect::<Option<Vec<String>>>()
+            .ok_or(anyhow!("Non-string variant in enum pattern"))?;
+          Ok(Self::Enum { variants })
         }
       },
 
@@ -178,6 +193,13 @@ impl StructPattern {
         };
         Ok(StructValue::Floating { size: *size, value })
       }
+      Self::Enum { variants } => {
+        let value = rdr.read_u8()?;
+        Ok(StructValue::Enum {
+          variants: variants.clone(),
+          value,
+        })
+      }
       Self::BinaryProperties { properties } => {
         let mut entries = vec![];
         for entry in properties {
@@ -223,6 +245,10 @@ pub enum StructValue {
   Floating {
     size: u8,
     value: f64,
+  },
+  Enum {
+    variants: Vec<String>,
+    value: u8,
   },
 }
 
@@ -281,6 +307,10 @@ impl StructValue {
         }
         Ok(())
       }
+      Self::Enum { value, .. } => {
+        curs.write_u8(*value)?;
+        Ok(())
+      }
     }
   }
 
@@ -302,6 +332,7 @@ impl StructValue {
       Self::Int { size, .. } => *size as usize,
       Self::UInt { size, .. } => *size as usize,
       Self::Floating { size, .. } => *size as usize,
+      Self::Enum { .. } => 1,
     }
   }
 }
@@ -355,11 +386,13 @@ impl StructPatterns {
     struct_type: &str,
     ctx: PropertyContext,
   ) -> Result<StructValue> {
-    let pattern = match self.patterns.get(struct_type) {
-      None => &self.default,
-      Some(pattern) => pattern,
+    let (pattern, is_default) = match self.patterns.get(struct_type) {
+      None => (&self.default, true),
+      Some(pattern) => (pattern, false),
     };
-    pattern.deserialize(rdr, ctx)
+    pattern
+      .deserialize(rdr, ctx)
+      .with_context(|| format!("For struct type {} (default = {})", struct_type, is_default))
   }
 
   pub fn serialize(

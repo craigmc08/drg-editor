@@ -39,6 +39,7 @@ pub enum Value {
   Bool,
   Enum(NameVariant), // For ByteProperty and EnumProperty, TODO better name?
   Array {
+    meta_tag: Option<(Meta, Tag)>,
     values: Vec<Value>,
   },
   Struct {

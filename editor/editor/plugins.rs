@@ -91,7 +91,7 @@ impl EditorPlugin {
   pub fn new(property: &Property) -> Self {
     let plugin = match &property.value {
       Value::Object(value) => PluginType::PluginObject { dep: value.clone() },
-      Value::Array { values } => {
+      Value::Array { values, .. } => {
         if let Tag::Array { inner_type } = property.tag {
           let mut sub_editors = vec![];
           // let sub_editors =

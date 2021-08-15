@@ -45,6 +45,50 @@
         }
       ]
     },
+    "RichCurveKey": {
+      "type": "binary-properties",
+      "properties": [
+        {
+          "name": "Interp Mode",
+          "type": "enum",
+          "variants": [ "Linear", "Constant", "Cubic", "None" ]
+        },
+        {
+          "name": "Tangent Mode",
+          "type": "enum",
+          "variants": [ "Auto", "User", "Break", "None" ]
+        },
+        {
+          "name": "Tangent Weight Mode",
+          "type": "enum",
+          "variants": [ "None", "Arrive", "Leave", "Both" ]
+        },
+        {
+          "name": "Time",
+          "type": "f32"
+        },
+        {
+          "name": "Value",
+          "type": "f32"
+        },
+        {
+          "name": "Arrive Tangent",
+          "type": "f32"
+        },
+        {
+          "name": "Arrive Tangent Weight",
+          "type": "f32"
+        },
+        {
+          "name": "Leave Tangent",
+          "type": "f32"
+        },
+        {
+          "name": "Leave Tangent Weight",
+          "type": "f32"
+        }
+      ]
+    },
     "Rotator": {
       "type": "binary-properties",
       "properties": [
