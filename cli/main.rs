@@ -18,6 +18,7 @@ fn main() {
     (@subcommand test =>
       (about: "Deserializes and serializes a single asset file")
       (@arg OUT: -o --out +takes_value "Filename to serialize asset to; default: ./out/out.[uasset/uexp]")
+      (@arg PRINT_VALUE: -v --print-value "If present, prints the value of the asset to stdout")
       (@arg ASSET: +takes_value +required "Path to asset to test")
     )
     (@subcommand all =>
@@ -37,7 +38,8 @@ fn main() {
   if let Some(matches) = matches.subcommand_matches("test") {
     let out_file = matches.value_of("OUT").unwrap_or("./out/out");
     let asset_loc = matches.value_of("ASSET").unwrap();
-    test_command(out_file, asset_loc);
+    let print_value = matches.is_present("PRINT_VALUE");
+    test_command(out_file, asset_loc, print_value);
   } else if let Some(matches) = matches.subcommand_matches("all") {
     let out_file = matches.value_of("OUT");
     let dir = matches.value_of("DIRECTORY").unwrap();
@@ -45,7 +47,7 @@ fn main() {
   }
 }
 
-fn test_command(out_file: &str, asset_loc: &str) {
+fn test_command(out_file: &str, asset_loc: &str, print_value: bool) {
   if let Err(err) = Asset::test_rw(asset_loc.as_ref()) {
     println!("Error testing r/w of asset");
     println!("{:?}", err);
@@ -58,6 +60,9 @@ fn test_command(out_file: &str, asset_loc: &str) {
       std::process::exit(-1);
     }
     Ok(asset) => {
+      if print_value {
+        println!("{:#?}", asset);
+      }
       asset.recalculate_offsets();
       if let Err(err) = asset.write_out(out_file.as_ref()) {
         println!("Failed to write asset");

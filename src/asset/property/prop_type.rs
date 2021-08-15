@@ -21,6 +21,7 @@ pub enum PropType {
   EnumProperty,
   ArrayProperty,
   StructProperty,
+  MapProperty,
 }
 
 impl PropType {

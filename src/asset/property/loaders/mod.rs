@@ -1,9 +1,11 @@
 mod array;
+mod map;
 mod other;
 mod simple;
 mod strct;
 
 use array::*;
+use map::*;
 use other::*;
 use simple::*;
 use strct::*;
@@ -27,6 +29,7 @@ pub const LOADERS: &[PropertyLoader] = &[
   LOADER_ENUM,
   LOADER_ARRAY,
   LOADER_STRUCT,
+  LOADER_MAP,
 ];
 
 type TagDeserializer = dyn Fn(&mut ByteReader, PropertyContext) -> Result<Tag>;

@@ -27,16 +27,30 @@ pub enum Value {
   Object(Reference),
   // TODO: unk1 might be the length of a string that is stored in the SoftObjectProperty
   // Find example of this happening?
-  SoftObject { object_name: NameVariant, unk1: u32 },
+  SoftObject {
+    object_name: NameVariant,
+    unk1: u32,
+  },
   Name(NameVariant),
   Str(String),
-  Text { bytes: Vec<u8> },
+  Text {
+    bytes: Vec<u8>, // TODO: how to actually represent TextProperty?
+  },
   Bool,
   Enum(NameVariant), // For ByteProperty and EnumProperty, TODO better name?
-  Array { values: Vec<Value> },
-  Struct { value: StructValue },
-  RawData { data: Vec<u8> },
-  // etc.
+  Array {
+    values: Vec<Value>,
+  },
+  Struct {
+    value: StructValue,
+  },
+  RawData {
+    data: Vec<u8>,
+  },
+  Map {
+    num_keys_to_remove: u32, // TODO: this may be the size of a second map, not sure though.
+    entries: Vec<(Value, Value)>, // assoc. list instead of hashmap since value isn't hashable
+  }, // etc.
 }
 
 #[derive(Debug, Clone)]
@@ -50,7 +64,11 @@ pub enum Tag {
   Struct {
     type_name: NameVariant,
     guid: [u8; 16],
-  }, // Etc.
+  },
+  Map {
+    key_type: PropType,
+    value_type: PropType,
+  },
 }
 
 #[derive(Debug, Clone)]
@@ -117,6 +135,7 @@ impl Property {
 }
 
 // Properties list serialization stuff
+#[derive(Debug)]
 pub struct Properties {
   pub properties: Vec<Property>,
   ends_with_none: bool,

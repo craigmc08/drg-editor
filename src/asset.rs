@@ -24,6 +24,7 @@ use std::io::prelude::Write;
 use std::io::Cursor;
 use std::path::Path;
 
+#[derive(Debug)]
 pub struct AssetHeader {
   pub summary: FileSummary,
   pub names: Names,
@@ -34,10 +35,12 @@ pub struct AssetHeader {
   pub dependencies: PreloadDependencies,
 }
 
+#[derive(Debug)]
 pub struct AssetExports {
   pub structs: Vec<Properties>,
 }
 
+#[derive(Debug)]
 pub struct Asset {
   pub header: AssetHeader,
   pub exports: AssetExports,
