@@ -56,6 +56,13 @@ impl BinaryPropertyPattern {
 }
 
 impl StructPattern {
+  /// Read numeric size from string like "i32", but in bytes instead of bits.
+  //
+  // # Examples
+  //
+  // ```
+  // StructPattern::read_numeric_size("i32") == Ok(4)
+  // ```
   fn read_numeric_size(typ: &str) -> Result<u8> {
     let size: u8 = typ[1..].parse()?;
     if size != 8 && size != 16 && size != 32 && size != 64 {
@@ -64,7 +71,7 @@ impl StructPattern {
         size
       );
     } else {
-      Ok(size)
+      Ok(size / 8) // Size in bytes
     }
   }
 
@@ -145,42 +152,42 @@ impl StructPattern {
       }
       Self::Int { size } => {
         let value: i64 = match size {
-          8 => rdr.read_i8()?.into(),
-          16 => rdr.read_i16::<LittleEndian>()?.into(),
-          32 => rdr.read_i32::<LittleEndian>()?.into(),
-          64 => rdr.read_i64::<LittleEndian>()?.into(),
+          1 => rdr.read_i8()?.into(),
+          2 => rdr.read_i16::<LittleEndian>()?.into(),
+          4 => rdr.read_i32::<LittleEndian>()?.into(),
+          8 => rdr.read_i64::<LittleEndian>()?.into(),
           _ => bail!("Invalid size {} for Int pattern", size),
         };
         Ok(StructValue::Int { size: *size, value })
       }
       Self::UInt { size } => {
         let value: u64 = match size {
-          8 => rdr.read_u8()?.into(),
-          16 => rdr.read_u16::<LittleEndian>()?.into(),
-          32 => rdr.read_u32::<LittleEndian>()?.into(),
-          64 => rdr.read_u64::<LittleEndian>()?.into(),
+          1 => rdr.read_u8()?.into(),
+          2 => rdr.read_u16::<LittleEndian>()?.into(),
+          4 => rdr.read_u32::<LittleEndian>()?.into(),
+          8 => rdr.read_u64::<LittleEndian>()?.into(),
           _ => bail!("Invalid size {} for UInt pattern", size),
         };
         Ok(StructValue::UInt { size: *size, value })
       }
       Self::Floating { size } => {
         let value: f64 = match size {
-          32 => rdr.read_f32::<LittleEndian>()?.into(),
-          64 => rdr.read_f64::<LittleEndian>()?.into(),
+          4 => rdr.read_f32::<LittleEndian>()?.into(),
+          8 => rdr.read_f64::<LittleEndian>()?.into(),
           _ => bail!("Invalid size {} for Floating pattern", size),
         };
         Ok(StructValue::Floating { size: *size, value })
       }
       Self::BinaryProperties { properties } => {
-        let mut values = HashMap::default();
+        let mut entries = vec![];
         for entry in properties {
           let value = entry
             .pattern
             .deserialize(rdr, ctx)
             .with_context(|| format!("In binary-properties.{}", entry.name))?;
-          values.insert(entry.name.clone(), value);
+          entries.push((entry.name.clone(), value));
         }
-        Ok(StructValue::BinaryProperties { properties: values })
+        Ok(StructValue::BinaryProperties { entries })
       }
     }
   }
@@ -202,7 +209,7 @@ pub enum StructValue {
     bytes: Vec<u8>,
   },
   BinaryProperties {
-    properties: HashMap<String, StructValue>,
+    entries: Vec<(String, StructValue)>, // assoc. list to preserve ordering
   },
 
   Int {
@@ -240,36 +247,36 @@ impl StructValue {
         Ok(())
       }
       Self::Binary { bytes } => curs.write_all(bytes).with_context(|| "Struct binary data"),
-      Self::BinaryProperties { properties } => {
-        for (_key, value) in properties.iter() {
+      Self::BinaryProperties { entries } => {
+        for (_key, value) in entries.iter() {
           value.serialize(curs, ctx)?;
         }
         Ok(())
       }
       Self::Int { size, value } => {
         match size {
-          8 => curs.write_i8((*value).try_into()?)?,
-          16 => curs.write_i16::<LittleEndian>((*value).try_into()?)?,
-          32 => curs.write_i32::<LittleEndian>((*value).try_into()?)?,
-          64 => curs.write_i64::<LittleEndian>((*value).try_into()?)?,
+          1 => curs.write_i8((*value).try_into()?)?,
+          2 => curs.write_i16::<LittleEndian>((*value).try_into()?)?,
+          4 => curs.write_i32::<LittleEndian>((*value).try_into()?)?,
+          8 => curs.write_i64::<LittleEndian>((*value).try_into()?)?,
           _ => unreachable!(),
         }
         Ok(())
       }
       Self::UInt { size, value } => {
         match size {
-          8 => curs.write_u8((*value).try_into()?)?,
-          16 => curs.write_u16::<LittleEndian>((*value).try_into()?)?,
-          32 => curs.write_u32::<LittleEndian>((*value).try_into()?)?,
-          64 => curs.write_u64::<LittleEndian>((*value).try_into()?)?,
+          1 => curs.write_u8((*value).try_into()?)?,
+          2 => curs.write_u16::<LittleEndian>((*value).try_into()?)?,
+          4 => curs.write_u32::<LittleEndian>((*value).try_into()?)?,
+          8 => curs.write_u64::<LittleEndian>((*value).try_into()?)?,
           _ => unreachable!(),
         }
         Ok(())
       }
       Self::Floating { size, value } => {
         match size {
-          32 => curs.write_f32::<LittleEndian>(*value as f32)?,
-          64 => curs.write_f64::<LittleEndian>(*value)?,
+          4 => curs.write_f32::<LittleEndian>(*value as f32)?,
+          8 => curs.write_f64::<LittleEndian>(*value)?,
           _ => unreachable!(),
         }
         Ok(())
@@ -291,7 +298,7 @@ impl StructValue {
           + none_size
       }
       Self::Binary { bytes } => bytes.len(),
-      Self::BinaryProperties { properties } => properties.iter().map(|(_, v)| v.byte_size()).sum(),
+      Self::BinaryProperties { entries } => entries.iter().map(|(_, v)| v.byte_size()).sum(),
       Self::Int { size, .. } => *size as usize,
       Self::UInt { size, .. } => *size as usize,
       Self::Floating { size, .. } => *size as usize,

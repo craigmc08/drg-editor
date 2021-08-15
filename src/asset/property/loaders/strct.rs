@@ -1,13 +1,11 @@
 use crate::asset::property::context::*;
 use crate::asset::property::loaders::PropertyLoader;
 use crate::asset::property::prop_type::*;
-use crate::asset::struct_pattern::StructPatterns;
 use crate::asset::*;
 use crate::loader;
 use crate::reader::*;
 use crate::util::*;
 use std::io::prelude::*;
-use std::io::{Seek, SeekFrom};
 
 pub const LOADER_STRUCT: PropertyLoader = loader!(
   [PropType::StructProperty],
@@ -44,7 +42,7 @@ fn serialize_struct_tag(tag: &Tag, curs: &mut Cursor<Vec<u8>>, ctx: PropertyCont
 fn deserialize_struct(
   rdr: &mut ByteReader,
   tag: &Tag,
-  max_size: u64,
+  _max_size: u64,
   ctx: PropertyContext,
 ) -> Result<Value> {
   match tag {
@@ -61,7 +59,7 @@ fn deserialize_struct(
 /// Panics if `val` and `tag` are not Struct variant.s
 fn serialize_struct(
   val: &Value,
-  tag: &Tag,
+  _tag: &Tag,
   curs: &mut Cursor<Vec<u8>>,
   ctx: PropertyContext,
 ) -> Result<()> {

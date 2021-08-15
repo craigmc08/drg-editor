@@ -13,7 +13,7 @@ pub const LOADER_BOOL: PropertyLoader = loader!(
   |_, _, _, _| Ok(()),
   serialize_bool_tag,
   |_, _| 0,
-  |_| 4,
+  |_| 1,
 );
 pub const LOADER_ENUM: PropertyLoader = loader!(
   [PropType::EnumProperty, PropType::ByteProperty],

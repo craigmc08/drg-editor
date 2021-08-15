@@ -113,8 +113,8 @@ impl Property {
   pub fn serialize(&self, curs: &mut Cursor<Vec<u8>>, ctx: PropertyContext) -> Result<()> {
     let loader = Self::get_loader_for(self.meta.typ)?;
 
-    // Compute real size
-    let new_size = self.byte_size() - self.meta.byte_size();
+    // Compute real value size
+    let new_size = loader.value_size(&self.value, &self.tag);
     let meta = Meta::new(self.meta.name.clone(), self.meta.typ, new_size as u64);
     meta.serialize(curs, ctx)?;
 

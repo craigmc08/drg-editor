@@ -109,7 +109,7 @@ fn value_size_array(value: &Value, tag: &Tag) -> usize {
         .iter()
         .map(|v| (loader.value_size)(v, &inner_tag))
         .sum::<usize>();
-      values_size
+      4 + values_size
     }
     (Value::RawData { data }, _) => data.len(),
     _ => {
