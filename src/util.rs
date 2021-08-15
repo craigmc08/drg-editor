@@ -30,7 +30,7 @@ pub fn read_u32<R: Read>(rdr: &mut R) -> Result<u32> {
 pub fn read_byte_string<R: Read>(rdr: &mut R) -> Result<Vec<u8>> {
   let length = read_u32(rdr)? as usize;
   if length == 0 {
-    bail!("Cannot read byte string with length 0 (figure out how to?)")
+    bail!("Cannot read byte string with length 0 at (figure out how to?)")
   } else {
     let chars = read_bytes(rdr, length - 1)?;
     rdr.read_exact(&mut [0])?; // Skip past 0 terminator

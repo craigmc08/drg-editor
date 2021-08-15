@@ -204,19 +204,11 @@ fn serialize_str(
   }
 }
 
-/// TextProperty contains 3 sections:
-/// - A 9 byte header: I'm not sure what this represents.
-/// - An array of n bytes, 0 terminated, preceeded by length. Not sure what it represents.
-/// - A string
-fn deserialize_text(rdr: &mut ByteReader, _: &Tag, _: u64, _: PropertyContext) -> Result<Value> {
-  let header = read_bytes(rdr, 9)?;
-  let bytes = read_byte_string(rdr)?;
-  let text = read_string(rdr)?;
-  Ok(Value::Text {
-    header,
-    bytes,
-    text,
-  })
+/// Not sure how TextProperty works, just read all the bytes in it for now
+fn deserialize_text(rdr: &mut ByteReader, _: &Tag, len: u64, _: PropertyContext) -> Result<Value> {
+  // let len = max_position - rdr.position();
+  let bytes: Vec<u8> = read_bytes(rdr, len as usize)?;
+  Ok(Value::Text { bytes })
 }
 /// # Panics
 /// Panics if Value is not Text variant
@@ -226,15 +218,8 @@ fn serialize_text(
   curs: &mut Cursor<Vec<u8>>,
   _: PropertyContext,
 ) -> Result<()> {
-  if let Value::Text {
-    header,
-    bytes,
-    text,
-  } = val
-  {
-    curs.write_all(header)?;
-    write_byte_string(curs, bytes)?;
-    write_string(curs, text)?;
+  if let Value::Text { bytes } = val {
+    curs.write_all(bytes)?;
     Ok(())
   } else {
     unreachable!()
@@ -243,8 +228,8 @@ fn serialize_text(
 /// # Panics
 /// Panics if Value is not Text variant
 fn size_of_text(val: &Value, _: &Tag) -> usize {
-  if let Value::Text { bytes, text, .. } = val {
-    9 + 4 + bytes.len() + 1 + 4 + text.as_bytes().len() + 1
+  if let Value::Text { bytes } = val {
+    bytes.len()
   } else {
     unreachable!()
   }

@@ -27,6 +27,70 @@
           "type": "u8"
         }
       ]
+    },
+    "Guid": {
+      "type": "binary",
+      "size": 16
+    },
+    "IntPoint": {
+      "type": "binary-properties",
+      "properties": [
+        {
+          "name": "x",
+          "type": "i32"
+        },
+        {
+          "name": "y",
+          "type": "i32"
+        }
+      ]
+    },
+    "Rotator": {
+      "type": "binary-properties",
+      "properties": [
+        {
+          "name": "x",
+          "type": "f32"
+        },
+        {
+          "name": "y",
+          "type": "f32"
+        },
+        {
+          "name": "z",
+          "type": "f32"
+        }
+      ]
+    },
+    "Vector": {
+      "type": "binary-properties",
+      "properties": [
+        {
+          "name": "x",
+          "type": "f32"
+        },
+        {
+          "name": "y",
+          "type": "f32"
+        },
+        {
+          "name": "z",
+          "type": "f32"
+        }
+      ]
+    },
+    "Vector2D": {
+      "type": "binary-properties",
+      "properties": [
+        {
+          "name": "x",
+          "type": "f32"
+        },
+        {
+          "name": "y",
+          "type": "f32"
+        }
+      ]
     }
   }
 }
