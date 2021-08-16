@@ -32,21 +32,6 @@ pub enum PluginType {
   },
 }
 
-impl PluginType {
-  fn to_property(&self, name: &NameVariant) -> Property {
-    let name = name.clone();
-    match self {
-      Self::PluginNone { original, .. } => original.clone(),
-      Self::PluginObject { dep } => dep.as_property(name),
-      Self::PluginArray { sub_editors, .. } => sub_editors.as_property(name),
-      Self::PluginBool { value } => value.as_property(name),
-      Self::PluginFloat { value } => value.as_property(name),
-      Self::PluginInt { value } => value.as_property(name),
-      Self::PluginStr { value } => value.to_string().as_property(name),
-    }
-  }
-}
-
 impl AsProperty for PluginType {
   fn prop_type(&self) -> PropType {
     match self {
@@ -232,16 +217,6 @@ impl EditorPlugin {
       tag,
       value,
     })
-  }
-
-  pub fn save(&self, strct: &mut Properties) {
-    if let Some(i) = strct
-      .properties
-      .iter()
-      .position(|prop| prop.meta.name == self.name)
-    {
-      strct.properties[i] = self.plugin.to_property(&self.name);
-    }
   }
 }
 
