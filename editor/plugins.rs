@@ -213,7 +213,7 @@ impl EditorPlugin {
       }
     };
     Self::new(&Property {
-      meta: Meta::new(NameVariant::new("", 0, &header.names), typ, 0),
+      meta: Meta::new(NameVariant::new("None", 0, &header.names), typ, 0),
       tag,
       value,
     })
