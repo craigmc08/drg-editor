@@ -3,8 +3,10 @@
 use glium::glutin;
 use glium::glutin::event::{Event, WindowEvent};
 use glium::glutin::event_loop::{ControlFlow, EventLoop};
+use glium::glutin::window::Icon;
 use glium::glutin::window::WindowBuilder;
 use glium::{Display, Surface};
+use image::io::Reader as ImageReader;
 use imgui::{Context, FontConfig, FontSource, Ui};
 use imgui_glium_renderer::Renderer;
 use imgui_winit_support::{HiDpiMode, WinitPlatform};
@@ -22,11 +24,25 @@ pub struct System {
 }
 
 pub fn init(title: &str) -> System {
+  // Load Window Icon (maybe)
+  let icon_img = ImageReader::open("data/icon.ico")
+    .map(|r| r.decode())
+    .ok()
+    .map(|r| r.ok())
+    .flatten();
+  let icon = icon_img.map(|img| {
+    let buf = img.into_rgba8();
+    let width = buf.width();
+    let height = buf.height();
+    Icon::from_rgba(buf.into_raw(), width, height).expect("Something went wrong loading icon")
+  });
+
   let event_loop = EventLoop::new();
   let context = glutin::ContextBuilder::new().with_vsync(true);
   let builder = WindowBuilder::new()
     .with_title(title.to_owned())
-    .with_inner_size(glutin::dpi::LogicalSize::new(1024f64, 768f64));
+    .with_inner_size(glutin::dpi::LogicalSize::new(1024f64, 768f64))
+    .with_window_icon(icon);
   let display = Display::new(builder, context, &event_loop).expect("Failed to initialize display");
 
   let mut imgui = Context::create();
