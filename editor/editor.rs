@@ -1,20 +1,12 @@
 use drg::*;
 
-mod internal;
-mod keyboard;
-mod operations;
-mod plugins;
-mod support;
-mod tools;
-
+use crate::internal::*;
+use crate::keyboard::*;
+use crate::operations::*;
+use crate::property_editor::*;
+use crate::tools::*;
 use imgui::*;
-use internal::*;
-use keyboard::*;
-use operations::*;
-use plugins::*;
 use std::path::Path;
-use tinyfiledialogs::{open_file_dialog, save_file_dialog_with_filter};
-use tools::*;
 
 const MAIN_WINDOW_FLAGS: WindowFlags = WindowFlags::NO_BRING_TO_FRONT_ON_FOCUS;
 
@@ -50,7 +42,7 @@ pub fn init_editor(editor: Editor) {
 
   ToolEditor::register_ops(&mut operations);
 
-  let system = support::init("DRG Editor");
+  let system = crate::support::init("DRG Editor");
 
   system.main_loop(move |(width, height), run, ui| {
     let dims = (width as f32, height as f32);
@@ -140,16 +132,9 @@ fn draw_editor(
         asset,
         export_editor,
       );
-      draw_property_selector(
-        [left, top + height / 2.0],
-        [width / 4.0, height / 2.0],
-        ui,
-        asset,
-        export_editor,
-      );
-      draw_property_editor(
-        [left + width / 4.0, top + height / 2.0],
-        [width / 4.0 * 3.0, height / 2.0],
+      draw_properties_editor(
+        (left, top + height / 2.0),
+        (width, height / 2.0),
         ui,
         asset,
         export_editor,
@@ -169,7 +154,7 @@ fn draw_menu(_pos: [f32; 2], _size: [f32; 2], run: &mut bool, ui: &Ui, editor: &
         .shortcut(im_str!("Ctrl+O"))
         .build(ui)
       {
-        operations::io::open(editor, ui);
+        crate::operations::io::open(editor, ui);
       }
 
       // FILE > SAVE
@@ -178,7 +163,7 @@ fn draw_menu(_pos: [f32; 2], _size: [f32; 2], run: &mut bool, ui: &Ui, editor: &
         .enabled(editor.state.has_header())
         .build(ui)
       {
-        operations::io::save(editor, ui);
+        crate::operations::io::save(editor, ui);
       }
 
       if MenuItem::new(im_str!("Exit")).build(ui) {
@@ -313,7 +298,7 @@ fn draw_exports_loader(pos: [f32; 2], size: [f32; 2], ui: &Ui, editor: &mut Edit
     error_modal(editor, ui);
 
     if ui.button(im_str!("Load Export Data [Ctrl+Shift+L]"), [0.0, 0.0]) {
-      operations::io::load_exports(editor, ui);
+      crate::operations::io::load_exports(editor, ui);
     }
   });
 }
@@ -339,96 +324,122 @@ fn draw_exports_selector(
       if ui.radio_button_bool(&ImString::from(export.to_string(asset.names())), active) && !active {
         // The selected export is changing, so have to deselect the property
         editor.selected_export = Some(export.clone());
-        editor.selected_property = None;
+        editor.properties_editor = Some(PropertiesEditor::default().with_flags(MAIN_WINDOW_FLAGS));
       }
     }
   });
 }
 
-fn draw_property_selector(
-  pos: [f32; 2],
-  size: [f32; 2],
+fn draw_properties_editor(
+  left_top: (f32, f32),
+  width_height: (f32, f32),
   ui: &Ui,
   asset: &mut Asset,
-  editor: &mut ExportEditor,
+  export_editor: &mut ExportEditor,
 ) {
-  let w = Window::new(im_str!("Properties"))
-    .flags(MAIN_WINDOW_FLAGS)
-    .resizable(false)
-    .collapsible(false)
-    .movable(false)
-    .position(pos, Condition::Always)
-    .size(size, Condition::Always);
-  w.build(&ui, || {
-    if let Some(selected) = &editor.selected_export {
-      let idx = asset
+  match export_editor {
+    ExportEditor {
+      selected_export: Some(selected_export),
+      properties_editor: Some(properties_editor),
+    } => {
+      let struct_idx = asset
         .list_exports()
         .iter()
-        .position(|x| x == selected)
+        .position(|x| x == selected_export)
         .expect("Invalid selected export. Report this crash to the maintainer.");
-      let strct = &asset.exports.structs[idx];
-      for prop in &strct.properties {
-        let active =
-          Some(prop.meta.name.clone()) == editor.selected_property.as_ref().map(|s| s.name.clone());
-        if ui.radio_button_bool(
-          &ImString::from(prop.meta.name.to_string(asset.names())),
-          active,
-        ) && !active
-        {
-          editor.selected_property = Some(SelectedProperty {
-            name: prop.meta.name.clone(),
-            dirty: false,
-            plugin: EditorPlugin::new(prop),
-            struct_idx: idx,
-          });
-        }
-      }
-    } else {
-      ui.text("Select an export");
+      let properties = &mut asset.exports.structs[struct_idx].properties;
+      properties_editor.draw(left_top, width_height, ui, &asset.header, properties);
     }
-  });
+    _ => {
+      // don't draw properties if no editor/no selected export
+    }
+  }
 }
 
-fn draw_property_editor(
-  pos: [f32; 2],
-  size: [f32; 2],
-  ui: &Ui,
-  asset: &mut Asset,
-  editor: &mut ExportEditor,
-) {
-  let w = Window::new(im_str!("Property Editor"))
-    .flags(MAIN_WINDOW_FLAGS)
-    .resizable(false)
-    .collapsible(false)
-    .movable(false)
-    .position(pos, Condition::Always)
-    .size(size, Condition::Always);
-  w.build(&ui, || {
-    if let Some(selected) = &mut editor.selected_property {
-      if selected.dirty {
-        ui.text(ImString::from(format!(
-          "*{}",
-          selected.name.to_string(asset.names())
-        )));
-      } else {
-        ui.text(ImString::from(selected.name.to_string(asset.names())));
-      }
-      ui.same_line(0.0);
-      if ui.button(im_str!("Save"), [0.0, 0.0]) {
-        selected.dirty = false;
-        selected
-          .plugin
-          .save(&mut asset.structs_mut()[selected.struct_idx]);
-      }
+// fn draw_property_selector(
+//   pos: [f32; 2],
+//   size: [f32; 2],
+//   ui: &Ui,
+//   asset: &mut Asset,
+//   editor: &mut ExportEditor,
+// ) {
+//   let w = Window::new(im_str!("Properties"))
+//     .flags(MAIN_WINDOW_FLAGS)
+//     .resizable(false)
+//     .collapsible(false)
+//     .movable(false)
+//     .position(pos, Condition::Always)
+//     .size(size, Condition::Always);
+//   w.build(&ui, || {
+//     if let Some(selected) = &editor.selected_export {
+//       let idx = asset
+//         .list_exports()
+//         .iter()
+//         .position(|x| x == selected)
+//         .expect("Invalid selected export. Report this crash to the maintainer.");
+//       let strct = &asset.exports.structs[idx];
+//       for prop in &strct.properties {
+//         let active =
+//           Some(prop.meta.name.clone()) == editor.selected_property.as_ref().map(|s| s.name.clone());
+//         if ui.radio_button_bool(
+//           &ImString::from(prop.meta.name.to_string(asset.names())),
+//           active,
+//         ) && !active
+//         {
+//           editor.selected_property = Some(SelectedProperty {
+//             name: prop.meta.name.clone(),
+//             dirty: false,
+//             plugin: EditorPlugin::new(prop),
+//             struct_idx: idx,
+//           });
+//         }
+//       }
+//     } else {
+//       ui.text("Select an export");
+//     }
+//   });
+// }
 
-      ui.separator();
-      let changed = selected.plugin.input(ui, &asset);
-      selected.dirty = selected.dirty || changed;
-    } else {
-      ui.text("Select a property to edit it");
-    }
-  });
-}
+// fn draw_property_editor(
+//   pos: [f32; 2],
+//   size: [f32; 2],
+//   ui: &Ui,
+//   asset: &mut Asset,
+//   editor: &mut ExportEditor,
+// ) {
+//   let w = Window::new(im_str!("Property Editor"))
+//     .flags(MAIN_WINDOW_FLAGS)
+//     .resizable(false)
+//     .collapsible(false)
+//     .movable(false)
+//     .position(pos, Condition::Always)
+//     .size(size, Condition::Always);
+//   w.build(&ui, || {
+//     if let Some(selected) = &mut editor.selected_property {
+//       if selected.dirty {
+//         ui.text(ImString::from(format!(
+//           "*{}",
+//           selected.name.to_string(asset.names())
+//         )));
+//       } else {
+//         ui.text(ImString::from(selected.name.to_string(asset.names())));
+//       }
+//       ui.same_line(0.0);
+//       if ui.button(im_str!("Save"), [0.0, 0.0]) {
+//         selected.dirty = false;
+//         selected
+//           .plugin
+//           .save(&mut asset.structs_mut()[selected.struct_idx]);
+//       }
+
+//       ui.separator();
+//       let changed = selected.plugin.input(ui, &asset);
+//       selected.dirty = selected.dirty || changed;
+//     } else {
+//       ui.text("Select a property to edit it");
+//     }
+//   });
+// }
 
 fn input_import(ui: &Ui, header: &AssetHeader, import: &mut EditableImport) {
   ui.input_text(im_str!("Class Package"), &mut import.class_package)

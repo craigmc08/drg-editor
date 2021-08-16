@@ -1,6 +1,7 @@
-use crate::editor::keyboard::*;
-use crate::editor::plugins::*;
-use crate::editor::tools::*;
+use crate::keyboard::*;
+use crate::plugins::*;
+use crate::property_editor::*;
+use crate::tools::*;
 use drg::asset::*;
 use imgui::*;
 use std::path::Path;
@@ -23,13 +24,6 @@ impl Default for EditableImport {
   }
 }
 
-pub struct SelectedProperty {
-  pub name: NameVariant,
-  pub dirty: bool,
-  pub struct_idx: usize,
-  pub plugin: EditorPlugin,
-}
-
 #[derive(Default)]
 pub struct ImportEditor {
   pub new_import: Option<EditableImport>,
@@ -39,7 +33,7 @@ pub struct ImportEditor {
 #[derive(Default)]
 pub struct ExportEditor {
   pub selected_export: Option<NameVariant>,
-  pub selected_property: Option<SelectedProperty>,
+  pub properties_editor: Option<PropertiesEditor>,
 }
 
 pub enum State {

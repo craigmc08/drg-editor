@@ -4,6 +4,13 @@
 extern crate clap;
 
 mod editor;
+mod internal;
+mod keyboard;
+mod operations;
+mod plugins;
+mod property_editor;
+mod support;
+mod tools;
 
 use drg::asset::*;
 use editor::*;

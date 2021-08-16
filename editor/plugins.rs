@@ -1,4 +1,4 @@
-use crate::editor::internal::*;
+use crate::internal::*;
 use drg::asset::property::meta::*;
 use drg::asset::property::prop_type::*;
 use drg::asset::*;
@@ -137,18 +137,18 @@ impl EditorPlugin {
   }
 
   /// Returns true if a change was made
-  pub fn input(&mut self, ui: &Ui, asset: &Asset) -> bool {
+  pub fn input(&mut self, ui: &Ui, header: &AssetHeader) -> bool {
     match &mut self.plugin {
       PluginType::PluginNone { reason, .. } => {
         ui.text(format!(
           "Can't edit {}: {}",
-          self.name.to_string(&asset.header.names),
+          self.name.to_string(&header.names),
           reason
         ));
         false
       }
       PluginType::PluginObject { dep } => {
-        if let Some(new_dep) = input_dependency(ui, "ObjectProperty", &asset.header, dep.clone()) {
+        if let Some(new_dep) = input_dependency(ui, "ObjectProperty", &header, dep.clone()) {
           *dep = new_dep;
           true
         } else {
@@ -173,7 +173,7 @@ impl EditorPlugin {
             to_remove.push(i);
           }
 
-          changed = changed || editor.input(ui, asset);
+          changed = changed || editor.input(ui, header);
 
           id.pop(ui);
         }
@@ -186,7 +186,7 @@ impl EditorPlugin {
         // Add button
         if ui.button(im_str!("Add Element"), [0.0, 0.0]) {
           changed = true;
-          let sub_editor = EditorPlugin::default_from_type(*value_type, &asset.header);
+          let sub_editor = EditorPlugin::default_from_type(*value_type, &header);
           sub_editors.push(sub_editor);
         }
 

@@ -1,5 +1,5 @@
-use crate::editor::internal::*;
-use crate::editor::keyboard::*;
+use crate::internal::*;
+use crate::keyboard::*;
 use imgui::Ui;
 
 pub mod io;

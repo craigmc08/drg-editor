@@ -1,7 +1,7 @@
-use crate::editor::internal::*;
-use crate::editor::keyboard::*;
-use crate::editor::operations::*;
+use crate::internal::*;
+use crate::keyboard::*;
 use crate::operation;
+use crate::operations::*;
 use drg::asset::*;
 use imgui::*;
 use winit::event::VirtualKeyCode;
