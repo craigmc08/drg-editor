@@ -14,6 +14,10 @@ pub enum PluginType {
   PluginObject {
     dep: Reference,
   },
+  PluginSoftObject {
+    object_name: NameVariant,
+    parent: Reference,
+  },
   PluginArray {
     value_type: PropType,
     sub_editors: Vec<EditorPlugin>,
@@ -37,6 +41,7 @@ impl AsProperty for PluginType {
     match self {
       PluginType::PluginNone { original, .. } => original.meta.typ,
       PluginType::PluginObject { .. } => PropType::ObjectProperty,
+      PluginType::PluginSoftObject { .. } => PropType::SoftObjectProperty,
       PluginType::PluginArray { .. } => PropType::ArrayProperty,
       PluginType::PluginBool { .. } => PropType::BoolProperty,
       PluginType::PluginFloat { .. } => PropType::FloatProperty,
@@ -44,7 +49,7 @@ impl AsProperty for PluginType {
       PluginType::PluginStr { .. } => PropType::StrProperty,
     }
   }
-  fn as_tag(&self) -> Tag {
+  fn as_tag(&self, _: &AssetHeader) -> Tag {
     match self {
       PluginType::PluginNone { original, .. } => original.tag.clone(),
       PluginType::PluginBool { value } => Tag::Bool(*value),
@@ -54,15 +59,22 @@ impl AsProperty for PluginType {
       _ => Tag::Simple(self.prop_type()),
     }
   }
-  fn as_value(&self) -> Value {
+  fn as_value(&self, header: &AssetHeader) -> Value {
     match self {
       PluginType::PluginNone { original, .. } => original.value.clone(),
-      PluginType::PluginObject { dep } => dep.as_value(),
-      PluginType::PluginArray { sub_editors, .. } => sub_editors.as_value(),
-      PluginType::PluginBool { value } => value.as_value(),
-      PluginType::PluginFloat { value } => value.as_value(),
-      PluginType::PluginInt { value } => value.as_value(),
-      PluginType::PluginStr { value } => value.to_string().as_value(),
+      PluginType::PluginObject { dep } => dep.as_value(header),
+      PluginType::PluginSoftObject {
+        object_name,
+        parent,
+      } => Value::SoftObject {
+        object_name: object_name.clone(),
+        parent: parent.clone(),
+      },
+      PluginType::PluginArray { sub_editors, .. } => sub_editors.as_value(header),
+      PluginType::PluginBool { value } => value.as_value(header),
+      PluginType::PluginFloat { value } => value.as_value(header),
+      PluginType::PluginInt { value } => value.as_value(header),
+      PluginType::PluginStr { value } => value.to_string().as_value(header),
     }
   }
 }
@@ -73,20 +85,30 @@ pub struct EditorPlugin {
 }
 
 impl EditorPlugin {
-  pub fn new(property: &Property) -> Self {
+  pub fn new(property: &Property, header: &AssetHeader) -> Self {
     let plugin = match &property.value {
       Value::Object(value) => PluginType::PluginObject { dep: value.clone() },
+      Value::SoftObject {
+        object_name,
+        parent,
+      } => PluginType::PluginSoftObject {
+        object_name: object_name.clone(),
+        parent: parent.clone(),
+      },
       Value::Array { values, .. } => {
         if let Tag::Array { inner_type } = property.tag {
           let mut sub_editors = vec![];
           for editor in values.iter().map(|v| {
             let mut sub_meta = property.meta.clone();
             sub_meta.typ = inner_type;
-            Self::new(&Property {
-              meta: sub_meta,
-              tag: property.tag.clone(),
-              value: v.clone(),
-            })
+            Self::new(
+              &Property {
+                meta: sub_meta,
+                tag: property.tag.clone(),
+                value: v.clone(),
+              },
+              header,
+            )
           }) {
             sub_editors.push(editor);
           }
@@ -140,6 +162,27 @@ impl EditorPlugin {
         } else {
           false
         }
+      }
+      PluginType::PluginSoftObject {
+        object_name,
+        parent,
+      } => {
+        let object_name_changed = if let Some(new_object_name) =
+          input_name_variant(ui, "Object Name", header, object_name.clone())
+        {
+          *object_name = new_object_name;
+          true
+        } else {
+          false
+        };
+        let parent_changed =
+          if let Some(new_parent) = input_dependency(ui, "Parent", header, parent.clone()) {
+            *parent = new_parent;
+            true
+          } else {
+            false
+          };
+        object_name_changed || parent_changed
       }
       PluginType::PluginArray {
         value_type,
@@ -213,11 +256,14 @@ impl EditorPlugin {
         panic!("Can't create default property editor for {}", typ)
       }
     };
-    Self::new(&Property {
-      meta: Meta::new(NameVariant::new("None", 0, &header.names), typ, 0),
-      tag,
-      value,
-    })
+    Self::new(
+      &Property {
+        meta: Meta::new(NameVariant::new("None", 0, &header.names), typ, 0),
+        tag,
+        value,
+      },
+      header,
+    )
   }
 }
 
@@ -225,15 +271,15 @@ impl AsProperty for EditorPlugin {
   fn prop_type(&self) -> PropType {
     self.plugin.prop_type()
   }
-  fn as_tag(&self) -> Tag {
-    self.plugin.as_tag()
+  fn as_tag(&self, header: &AssetHeader) -> Tag {
+    self.plugin.as_tag(header)
   }
-  fn as_value(&self) -> Value {
-    self.plugin.as_value()
+  fn as_value(&self, header: &AssetHeader) -> Value {
+    self.plugin.as_value(header)
   }
 }
 impl FromProperty for EditorPlugin {
-  fn from_property(property: &Property) -> Option<Self> {
-    Some(Self::new(property))
+  fn from_property(property: &Property, header: &AssetHeader) -> Option<Self> {
+    Some(Self::new(property, header))
   }
 }

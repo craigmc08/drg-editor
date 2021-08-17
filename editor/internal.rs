@@ -101,6 +101,42 @@ pub struct Editor {
   pub keyboard: Keyboard,
 }
 
+pub fn input_name_variant(
+  ui: &Ui,
+  label: &str,
+  header: &AssetHeader,
+  name: NameVariant,
+) -> Option<NameVariant> {
+  let NameVariant {
+    mut name_idx,
+    variant,
+  } = name;
+  let indices = (0..header.names.names.len()).collect::<Vec<usize>>();
+
+  let name_changed = ComboBox::new(&ImString::new(format!("{} Name", label))).build_simple(
+    ui,
+    &mut name_idx,
+    &indices[..],
+    &|&i| ImString::new(&header.names.names[i].name).into(),
+  );
+  let mut variant_i32 = variant as i32;
+  let variant_changed = ui
+    .input_int(
+      &ImString::new(format!("{} Variant", label)),
+      &mut variant_i32,
+    )
+    .build();
+
+  if name_changed || variant_changed {
+    Some(NameVariant {
+      name_idx,
+      variant: variant_i32 as u32,
+    })
+  } else {
+    None
+  }
+}
+
 /// Returns some value if the Reference is changed
 pub fn input_dependency(
   ui: &Ui,

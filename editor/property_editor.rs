@@ -59,7 +59,7 @@ impl PropertiesEditor {
           self.selected = Some(SelectedProperty {
             name: prop.meta.name.clone(),
             dirty: false,
-            plugin: EditorPlugin::new(prop),
+            plugin: EditorPlugin::new(prop, header),
           });
         }
       }
@@ -101,7 +101,7 @@ impl PropertiesEditor {
               selected.name.to_string(&header.names)
             ));
           selected.dirty = false;
-          properties[index] = selected.plugin.as_property(selected.name.clone());
+          properties[index] = selected.plugin.as_property(selected.name.clone(), header);
         }
 
         ui.separator();

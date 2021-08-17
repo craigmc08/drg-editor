@@ -5,15 +5,15 @@ use crate::asset::*;
 /// Represents a value that can be turned into the parts of a property
 pub trait AsProperty {
   fn prop_type(&self) -> PropType;
-  fn as_tag(&self) -> Tag;
-  fn as_value(&self) -> Value;
+  fn as_tag(&self, header: &AssetHeader) -> Tag;
+  fn as_value(&self, header: &AssetHeader) -> Value;
 
-  fn as_property(&self, name: NameVariant) -> Property {
+  fn as_property(&self, name: NameVariant, header: &AssetHeader) -> Property {
     Property {
       // Size doesn't matter
       meta: Meta::new(name, self.prop_type(), 0),
-      tag: self.as_tag(),
-      value: self.as_value(),
+      tag: self.as_tag(header),
+      value: self.as_value(header),
     }
   }
 }
@@ -21,7 +21,7 @@ pub trait AsProperty {
 // Represents a value that can be turned into a property with a simple tag
 pub trait AsSimpleProperty {
   fn simple_prop_type() -> PropType;
-  fn as_simple_value(&self) -> Value;
+  fn as_simple_value(&self, header: &AssetHeader) -> Value;
 }
 
 impl<T> AsProperty for T
@@ -31,11 +31,11 @@ where
   fn prop_type(&self) -> PropType {
     Self::simple_prop_type()
   }
-  fn as_tag(&self) -> Tag {
+  fn as_tag(&self, _: &AssetHeader) -> Tag {
     Tag::Simple(self.prop_type())
   }
-  fn as_value(&self) -> Value {
-    self.as_simple_value()
+  fn as_value(&self, header: &AssetHeader) -> Value {
+    self.as_simple_value(header)
   }
 }
 
@@ -44,7 +44,7 @@ pub trait FromProperty
 where
   Self: std::marker::Sized,
 {
-  fn from_property(property: &Property) -> Option<Self>;
+  fn from_property(property: &Property, header: &AssetHeader) -> Option<Self>;
 }
 
 /// Represents a value that can be created from a value
@@ -52,41 +52,41 @@ pub trait FromValue
 where
   Self: std::marker::Sized,
 {
-  fn from_value(value: &Value) -> Option<Self>;
+  fn from_value(value: &Value, header: &AssetHeader) -> Option<Self>;
 }
 
 impl<T: FromValue> FromProperty for T {
-  fn from_property(property: &Property) -> Option<Self> {
-    Self::from_value(&property.value)
+  fn from_property(property: &Property, header: &AssetHeader) -> Option<Self> {
+    Self::from_value(&property.value, header)
   }
 }
 
 impl Property {
   /// This can't be implemented using the standard TryInto trait because it
   /// overlaps with the generic implementation there...
-  pub fn try_into<T>(&self) -> Option<T>
+  pub fn try_into<T>(&self, header: &AssetHeader) -> Option<T>
   where
     T: FromProperty,
   {
-    T::from_property(self)
+    T::from_property(self, header)
   }
 }
 
 impl Properties {
   /// Get the value of a property by name
-  pub fn get<T: FromProperty>(&self, name: &str, names: &Names) -> Option<T> {
+  pub fn get<T: FromProperty>(&self, name: &str, header: &AssetHeader) -> Option<T> {
     for prop in self.properties.iter() {
-      if prop.meta.name == NameVariant::parse(name, names) {
-        return T::from_property(prop);
+      if prop.meta.name == NameVariant::parse(name, &header.names) {
+        return T::from_property(prop, header);
       }
     }
     None
   }
 
   /// Set the value of a property by name
-  pub fn set<T: AsProperty>(&mut self, name: &str, value: T, names: &Names) {
-    let name = NameVariant::parse(name, names);
-    let new_prop = value.as_property(name.clone());
+  pub fn set<T: AsProperty>(&mut self, name: &str, value: T, header: &AssetHeader) {
+    let name = NameVariant::parse(name, &header.names);
+    let new_prop = value.as_property(name.clone(), header);
     match self
       .properties
       .iter()
@@ -205,15 +205,15 @@ impl AsProperty for bool {
   fn prop_type(&self) -> PropType {
     PropType::BoolProperty
   }
-  fn as_tag(&self) -> Tag {
+  fn as_tag(&self, _: &AssetHeader) -> Tag {
     Tag::Bool(*self)
   }
-  fn as_value(&self) -> Value {
+  fn as_value(&self, _: &AssetHeader) -> Value {
     Value::Bool
   }
 }
 impl FromProperty for bool {
-  fn from_property(property: &Property) -> Option<Self> {
+  fn from_property(property: &Property, _: &AssetHeader) -> Option<Self> {
     match &property.tag {
       Tag::Bool(value) => Some(*value),
       _ => None,
@@ -225,12 +225,12 @@ impl AsSimpleProperty for i32 {
   fn simple_prop_type() -> PropType {
     PropType::IntProperty
   }
-  fn as_simple_value(&self) -> Value {
+  fn as_simple_value(&self, _: &AssetHeader) -> Value {
     Value::Int(*self)
   }
 }
 impl FromValue for i32 {
-  fn from_value(value: &Value) -> Option<Self> {
+  fn from_value(value: &Value, _: &AssetHeader) -> Option<Self> {
     match value {
       Value::Int(value) => Some(*value),
       _ => None,
@@ -242,12 +242,12 @@ impl AsSimpleProperty for f32 {
   fn simple_prop_type() -> PropType {
     PropType::FloatProperty
   }
-  fn as_simple_value(&self) -> Value {
+  fn as_simple_value(&self, _: &AssetHeader) -> Value {
     Value::Float(*self)
   }
 }
 impl FromValue for f32 {
-  fn from_value(value: &Value) -> Option<Self> {
+  fn from_value(value: &Value, _: &AssetHeader) -> Option<Self> {
     match value {
       Value::Float(value) => Some(*value),
       _ => None,
@@ -262,12 +262,12 @@ where
   fn prop_type(&self) -> PropType {
     PropType::ArrayProperty
   }
-  fn as_tag(&self) -> Tag {
+  fn as_tag(&self, _: &AssetHeader) -> Tag {
     let inner_type = self[0].prop_type();
     Tag::Array { inner_type }
   }
-  fn as_value(&self) -> Value {
-    let values: Vec<Value> = self.iter().map(|t| t.as_value()).collect();
+  fn as_value(&self, header: &AssetHeader) -> Value {
+    let values: Vec<Value> = self.iter().map(|t| t.as_value(header)).collect();
     Value::Array {
       meta_tag: None,
       values,
@@ -278,9 +278,14 @@ impl<T> FromValue for Vec<T>
 where
   T: FromValue,
 {
-  fn from_value(value: &Value) -> Option<Self> {
+  fn from_value(value: &Value, header: &AssetHeader) -> Option<Self> {
     match &value {
-      Value::Array { values, .. } => Some(values.iter().filter_map(|v| T::from_value(v)).collect()),
+      Value::Array { values, .. } => Some(
+        values
+          .iter()
+          .filter_map(|v| T::from_value(v, header))
+          .collect(),
+      ),
       _ => None,
     }
   }
@@ -290,12 +295,12 @@ impl AsSimpleProperty for Reference {
   fn simple_prop_type() -> PropType {
     PropType::ObjectProperty
   }
-  fn as_simple_value(&self) -> Value {
+  fn as_simple_value(&self, _: &AssetHeader) -> Value {
     Value::Object(self.clone())
   }
 }
 impl FromValue for Reference {
-  fn from_value(value: &Value) -> Option<Self> {
+  fn from_value(value: &Value, _: &AssetHeader) -> Option<Self> {
     match &value {
       Value::Object(value) => Some(value.clone()),
       _ => None,
@@ -307,12 +312,12 @@ impl AsSimpleProperty for String {
   fn simple_prop_type() -> PropType {
     PropType::StrProperty
   }
-  fn as_simple_value(&self) -> Value {
+  fn as_simple_value(&self, _: &AssetHeader) -> Value {
     Value::Str(self.clone())
   }
 }
 impl FromValue for String {
-  fn from_value(value: &Value) -> Option<Self> {
+  fn from_value(value: &Value, _: &AssetHeader) -> Option<Self> {
     match &value {
       Value::Str(value) => Some(value.clone()),
       _ => None,

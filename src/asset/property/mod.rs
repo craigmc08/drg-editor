@@ -29,7 +29,7 @@ pub enum Value {
   // Find example of this happening?
   SoftObject {
     object_name: NameVariant,
-    unk1: u32,
+    parent: Reference,
   },
   Name(NameVariant),
   Str(String),

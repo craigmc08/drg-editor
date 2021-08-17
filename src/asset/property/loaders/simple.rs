@@ -142,7 +142,7 @@ fn deserialize_softobject(
 ) -> Result<Value> {
   Ok(Value::SoftObject {
     object_name: NameVariant::read(rdr, ctx.names).with_context(|| "SoftObject.object_name")?,
-    unk1: rdr.read_u32::<LittleEndian>()?,
+    parent: Reference::read(rdr, ctx.imports, ctx.exports).with_context(|| "SoftObject.parent")?,
   })
 }
 /// # Panics
@@ -153,11 +153,17 @@ fn serialize_softobject(
   curs: &mut Cursor<Vec<u8>>,
   ctx: PropertyContext,
 ) -> Result<()> {
-  if let Value::SoftObject { object_name, unk1 } = val {
+  if let Value::SoftObject {
+    object_name,
+    parent,
+  } = val
+  {
     object_name
       .write(curs, ctx.names)
       .with_context(|| "SoftObject.object_name")?;
-    curs.write_u32::<LittleEndian>(*unk1)?;
+    parent
+      .write(curs, ctx.names, ctx.imports, ctx.exports)
+      .with_context(|| "SoftObject.parent")?;
     Ok(())
   } else {
     unreachable!()
