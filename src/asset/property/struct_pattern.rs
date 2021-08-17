@@ -5,19 +5,21 @@ use crate::reader::*;
 use crate::util::read_bytes;
 use anyhow::*;
 use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use serde_json::Value as JsonValue;
+use serde::Deserialize;
 use std::collections::HashMap;
 use std::convert::TryInto;
 
 pub static mut STRUCT_PATTERNS: Option<StructPatterns> = None;
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 struct BinaryPropertyPattern {
   name: String,
+  #[serde(flatten)]
   pattern: StructPattern,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
 enum StructPattern {
   PropertyList,
   Binary {
@@ -41,102 +43,102 @@ enum StructPattern {
   },
 }
 
-impl BinaryPropertyPattern {
-  fn from_json(val: &JsonValue) -> Result<Self> {
-    match &val["name"] {
-      JsonValue::Null => bail!("Missing name property in binary property pattern"),
-      JsonValue::String(name) => {
-        let pattern =
-          StructPattern::from_json(val).with_context(|| "In binary property pattern")?;
-        Ok(Self {
-          name: name.clone(),
-          pattern,
-        })
-      }
-      _ => bail!("Name property in binary property pattern is the wrong type (expected number)"),
-    }
-  }
-}
+// impl BinaryPropertyPattern {
+//   fn from_json(val: &JsonValue) -> Result<Self> {
+//     match &val["name"] {
+//       JsonValue::Null => bail!("Missing name property in binary property pattern"),
+//       JsonValue::String(name) => {
+//         let pattern =
+//           StructPattern::from_json(val).with_context(|| "In binary property pattern")?;
+//         Ok(Self {
+//           name: name.clone(),
+//           pattern,
+//         })
+//       }
+//       _ => bail!("Name property in binary property pattern is the wrong type (expected number)"),
+//     }
+//   }
+// }
 
 impl StructPattern {
-  /// Read numeric size from string like "i32", but in bytes instead of bits.
-  //
-  // # Examples
-  //
-  // ```
-  // StructPattern::read_numeric_size("i32") == Ok(4)
-  // ```
-  fn read_numeric_size(typ: &str) -> Result<u8> {
-    let size: u8 = typ[1..].parse()?;
-    if size != 8 && size != 16 && size != 32 && size != 64 {
-      bail!(
-        "Invalid size for numeric pattern {}. Must be 8, 16, 32, or 64",
-        size
-      );
-    } else {
-      Ok(size / 8) // Size in bytes
-    }
-  }
+  // /// Read numeric size from string like "i32", but in bytes instead of bits.
+  // //
+  // // # Examples
+  // //
+  // // ```
+  // // StructPattern::read_numeric_size("i32") == Ok(4)
+  // // ```
+  // fn read_numeric_size(typ: &str) -> Result<u8> {
+  //   let size: u8 = typ[1..].parse()?;
+  //   if size != 8 && size != 16 && size != 32 && size != 64 {
+  //     bail!(
+  //       "Invalid size for numeric pattern {}. Must be 8, 16, 32, or 64",
+  //       size
+  //     );
+  //   } else {
+  //     Ok(size / 8) // Size in bytes
+  //   }
+  // }
 
-  fn from_json(val: &JsonValue) -> Result<Self> {
-    match val["type"].as_str() {
-      None => bail!("Missing type property in struct pattern"),
+  // fn from_json(val: &JsonValue) -> Result<Self> {
+  //   match val["type"].as_str() {
+  //     None => bail!("Missing type property in struct pattern"),
 
-      Some("property-list") => Ok(Self::PropertyList),
+  //     Some("property-list") => Ok(Self::PropertyList),
 
-      Some("binary") => match &val["size"] {
-        JsonValue::Null => bail!("Missing size property in struct pattern of type 'binary'"),
-        JsonValue::Number(size) => Ok(Self::Binary {
-          size: size.as_u64().unwrap() as usize,
-        }),
-        _ => bail!(
-          "Size property in struct pattern of type 'binary' is the wrong type (expected number)"
-        ),
-      },
+  //     Some("binary") => match &val["size"] {
+  //       JsonValue::Null => bail!("Missing size property in struct pattern of type 'binary'"),
+  //       JsonValue::Number(size) => Ok(Self::Binary {
+  //         size: size.as_u64().unwrap() as usize,
+  //       }),
+  //       _ => bail!(
+  //         "Size property in struct pattern of type 'binary' is the wrong type (expected number)"
+  //       ),
+  //     },
 
-      Some("binary-properties") => match val["properties"].as_array() {
-        None => bail!("Missing properties property in struct pattern of type 'binary-property'"),
-        Some(props) => {
-          let properties = props
-            .iter()
-            .map(BinaryPropertyPattern::from_json)
-            .collect::<Result<Vec<BinaryPropertyPattern>>>()
-            .with_context(|| "In binary-properties")?;
-          Ok(Self::BinaryProperties { properties })
-        }
-      },
+  //     Some("binary-properties") => match val["properties"].as_array() {
+  //       None => bail!("Missing properties property in struct pattern of type 'binary-property'"),
+  //       Some(props) => {
+  //         let properties = props
+  //           .iter()
+  //           .map(BinaryPropertyPattern::from_json)
+  //           .collect::<Result<Vec<BinaryPropertyPattern>>>()
+  //           .with_context(|| "In binary-properties")?;
+  //         Ok(Self::BinaryProperties { properties })
+  //       }
+  //     },
 
-      Some("enum") => match val["variants"].as_array() {
-        None => bail!("Missing variants property in struct pattern of type 'enum'"),
-        Some(variants) => {
-          let variants = variants
-            .iter()
-            .map(|v| v.as_str().map(std::string::ToString::to_string))
-            .collect::<Option<Vec<String>>>()
-            .ok_or(anyhow!("Non-string variant in enum pattern"))?;
-          Ok(Self::Enum { variants })
-        }
-      },
+  //     Some("enum") => match val["variants"].as_array() {
+  //       None => bail!("Missing variants property in struct pattern of type 'enum'"),
+  //       Some(variants) => {
+  //         let variants = variants
+  //           .iter()
+  //           .map(|v| v.as_str().map(std::string::ToString::to_string))
+  //           .collect::<Option<Vec<String>>>()
+  //           .ok_or(anyhow!("Non-string variant in enum pattern"))?;
+  //         Ok(Self::Enum { variants })
+  //       }
+  //     },
 
-      Some(typ) => {
-        if &typ[0..1] == "i" {
-          Ok(Self::Int {
-            size: Self::read_numeric_size(typ)?,
-          })
-        } else if &typ[0..1] == "u" {
-          Ok(Self::UInt {
-            size: Self::read_numeric_size(typ)?,
-          })
-        } else if &typ[0..1] == "f" {
-          Ok(Self::Floating {
-            size: Self::read_numeric_size(typ)?,
-          })
-        } else {
-          bail!("Unknown type property value for struct pattern '{}'", typ)
-        }
-      }
-    }
-  }
+  //     Some(typ) => {
+  //       if &typ[0..1] == "i" {
+  //         Ok(Self::Int {
+  //           size: Self::read_numeric_size(typ)?,
+  //         })
+  //       } else if &typ[0..1] == "u" {
+  //         Ok(Self::UInt {
+  //           size: Self::read_numeric_size(typ)?,
+  //         })
+  //       } else if &typ[0..1] == "f" {
+  //         Ok(Self::Floating {
+  //           size: Self::read_numeric_size(typ)?,
+  //         })
+  //       } else {
+  //         bail!("Unknown type property value for struct pattern '{}'", typ)
+  //       }
+  //     }
+  //   }
+  // }
 
   fn deserialize(&self, rdr: &mut ByteReader, ctx: PropertyContext) -> Result<StructValue> {
     match self {
@@ -215,7 +217,7 @@ impl StructPattern {
   }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 pub struct StructPatterns {
   default: StructPattern,
   patterns: HashMap<String, StructPattern>,
@@ -338,33 +340,33 @@ impl StructValue {
 }
 
 impl StructPatterns {
-  pub fn from_json(val: &JsonValue) -> Result<Self> {
-    let default = match &val["default"] {
-      JsonValue::Null => bail!("Missing required default key in struct patterns json"),
-      default_pattern_json => StructPattern::from_json(default_pattern_json)
-        .with_context(|| "In default pattern for struct patterns")?,
-    };
-    let patterns = match &val["patterns"] {
-      JsonValue::Object(obj) => {
-        let mut patterns = HashMap::default();
-        for (name, pattern_json) in obj.iter() {
-          patterns.insert(
-            name.clone(),
-            StructPattern::from_json(pattern_json)
-              .with_context(|| format!("For pattern '{}' in struct patterns", name))?,
-          );
-        }
-        patterns
-      }
-      _ => bail!("Missing/wrong type for patterns key in struct patterns json"),
-    };
-    Ok(Self { default, patterns })
-  }
+  // pub fn from_json(val: &JsonValue) -> Result<Self> {
+  //   let default = match &val["default"] {
+  //     JsonValue::Null => bail!("Missing required default key in struct patterns json"),
+  //     default_pattern_json => StructPattern::from_json(default_pattern_json)
+  //       .with_context(|| "In default pattern for struct patterns")?,
+  //   };
+  //   let patterns = match &val["patterns"] {
+  //     JsonValue::Object(obj) => {
+  //       let mut patterns = HashMap::default();
+  //       for (name, pattern_json) in obj.iter() {
+  //         patterns.insert(
+  //           name.clone(),
+  //           StructPattern::from_json(pattern_json)
+  //             .with_context(|| format!("For pattern '{}' in struct patterns", name))?,
+  //         );
+  //       }
+  //       patterns
+  //     }
+  //     _ => bail!("Missing/wrong type for patterns key in struct patterns json"),
+  //   };
+  //   Ok(Self { default, patterns })
+  // }
 
   pub fn from_file(fp: &Path) -> Result<Self> {
     let contents = std::fs::read_to_string(fp)?;
-    let json: JsonValue = serde_json::from_str(&contents)?;
-    Self::from_json(&json)
+    let value = serde_json::from_str(&contents)?;
+    Ok(value)
   }
 
   /// Loads struct patterns from fp into static instance, get it with `StructPatterns::get()`

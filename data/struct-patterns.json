@@ -1,138 +1,158 @@
 {
   "default": {
-    "type": "property-list"
+    "type": "PropertyList"
   },
   "patterns": {
     "Box": {
-      "type": "binary",
+      "type": "Binary",
       "size": 25
     },
     "Color": {
-      "type": "binary-properties",
+      "type": "BinaryProperties",
       "properties": [
         {
           "name": "Red",
-          "type": "u8"
+          "type": "UInt",
+          "size": 1
         },
         {
           "name": "Green",
-          "type": "u8"
+          "type": "UInt",
+          "size": 1
         },
         {
           "name": "Blue",
-          "type": "u8"
+          "type": "UInt",
+          "size": 1
         },
         {
           "name": "Alpha",
-          "type": "u8"
+          "type": "UInt",
+          "size": 1
         }
       ]
     },
     "Guid": {
-      "type": "binary",
+      "type": "Binary",
       "size": 16
     },
     "IntPoint": {
-      "type": "binary-properties",
+      "type": "BinaryProperties",
       "properties": [
         {
           "name": "x",
-          "type": "i32"
+          "type": "Int",
+          "size": 4
         },
         {
           "name": "y",
-          "type": "i32"
+          "type": "Int",
+          "size": 4
         }
       ]
     },
     "RichCurveKey": {
-      "type": "binary-properties",
+      "type": "BinaryProperties",
       "properties": [
         {
           "name": "Interp Mode",
-          "type": "enum",
+          "type": "Enum",
           "variants": [ "Linear", "Constant", "Cubic", "None" ]
         },
         {
           "name": "Tangent Mode",
-          "type": "enum",
+          "type": "Enum",
           "variants": [ "Auto", "User", "Break", "None" ]
         },
         {
           "name": "Tangent Weight Mode",
-          "type": "enum",
+          "type": "Enum",
           "variants": [ "None", "Arrive", "Leave", "Both" ]
         },
         {
           "name": "Time",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         },
         {
           "name": "Value",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         },
         {
           "name": "Arrive Tangent",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         },
         {
           "name": "Arrive Tangent Weight",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         },
         {
           "name": "Leave Tangent",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         },
         {
           "name": "Leave Tangent Weight",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         }
       ]
     },
     "Rotator": {
-      "type": "binary-properties",
+      "type": "BinaryProperties",
       "properties": [
         {
           "name": "x",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         },
         {
           "name": "y",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         },
         {
           "name": "z",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         }
       ]
     },
     "Vector": {
-      "type": "binary-properties",
+      "type": "BinaryProperties",
       "properties": [
         {
           "name": "x",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         },
         {
           "name": "y",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         },
         {
           "name": "z",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         }
       ]
     },
     "Vector2D": {
-      "type": "binary-properties",
+      "type": "BinaryProperties",
       "properties": [
         {
           "name": "x",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         },
         {
           "name": "y",
-          "type": "f32"
+          "type": "Floating",
+          "size": 4
         }
       ]
     }
