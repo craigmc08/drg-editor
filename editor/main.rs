@@ -8,6 +8,7 @@ mod internal;
 mod keyboard;
 mod operations;
 mod plugins;
+mod property_creator;
 mod property_editor;
 mod support;
 mod tools;

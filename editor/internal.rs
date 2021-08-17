@@ -1,6 +1,7 @@
 use crate::keyboard::*;
 use crate::property_editor::*;
 use crate::tools::*;
+use drg::asset::property::prop_type::*;
 use drg::asset::*;
 use imgui::*;
 use std::path::Path;
@@ -99,6 +100,21 @@ pub struct Editor {
   pub err: Option<anyhow::Error>,
   pub tool: Option<ToolEditor>,
   pub keyboard: Keyboard,
+}
+
+pub fn input_prop_type(ui: &Ui, label: &str, value: &mut PropType) -> bool {
+  let mut idx = ALL_PROP_TYPES
+    .iter()
+    .position(|v| v == value)
+    .expect("ALL_PROP_TYPES contains all prop types");
+  let changed =
+    ComboBox::new(&ImString::new(label)).build_simple(ui, &mut idx, &ALL_PROP_TYPES, &|&i| {
+      ImString::from(i.to_string()).into()
+    });
+  if changed {
+    *value = ALL_PROP_TYPES[idx];
+  };
+  changed
 }
 
 pub fn input_name_variant(

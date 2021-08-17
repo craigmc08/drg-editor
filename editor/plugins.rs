@@ -1,4 +1,5 @@
 use crate::internal::*;
+use crate::property_creator::*;
 use drg::asset::property::meta::*;
 use drg::asset::property::prop_type::*;
 use drg::asset::*;
@@ -215,7 +216,7 @@ impl EditorPlugin {
         // Add button
         if ui.button(im_str!("Add Element"), [0.0, 0.0]) {
           changed = true;
-          let sub_editor = EditorPlugin::default_from_type(*value_type, &header);
+          let sub_editor = EditorPlugin::default_from_type(*value_type, ui, &header);
           sub_editors.push(sub_editor);
         }
 
@@ -242,7 +243,7 @@ impl EditorPlugin {
     }
   }
 
-  pub fn default_from_type(typ: PropType, header: &AssetHeader) -> Self {
+  pub fn default_from_type(typ: PropType, ui: &Ui, header: &AssetHeader) -> Self {
     let (tag, value) = match typ {
       PropType::ObjectProperty => (Tag::Simple(typ), Value::Object(Reference::uobject())),
       PropType::BoolProperty => (Tag::Bool(false), Value::Bool),

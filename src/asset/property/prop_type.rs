@@ -24,6 +24,23 @@ pub enum PropType {
   MapProperty,
 }
 
+pub const ALL_PROP_TYPES: [PropType; 14] = [
+  PropType::IntProperty,
+  PropType::UInt8Property,
+  PropType::FloatProperty,
+  PropType::ObjectProperty,
+  PropType::SoftObjectProperty,
+  PropType::NameProperty,
+  PropType::StrProperty,
+  PropType::TextProperty,
+  PropType::BoolProperty,
+  PropType::ByteProperty,
+  PropType::EnumProperty,
+  PropType::ArrayProperty,
+  PropType::StructProperty,
+  PropType::MapProperty,
+];
+
 impl PropType {
   pub fn deserialize(rdr: &mut ByteReader, ctx: PropertyContext) -> Result<Self> {
     let name = NameVariant::read(rdr, ctx.names).with_context(|| "Deserializing PropType")?;
