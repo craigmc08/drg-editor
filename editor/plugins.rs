@@ -79,10 +79,11 @@ impl EditorPlugin {
       Value::Array { values, .. } => {
         if let Tag::Array { inner_type } = property.tag {
           let mut sub_editors = vec![];
-          // let sub_editors =
           for editor in values.iter().map(|v| {
+            let mut sub_meta = property.meta.clone();
+            sub_meta.typ = inner_type;
             Self::new(&Property {
-              meta: property.meta.clone(),
+              meta: sub_meta,
               tag: property.tag.clone(),
               value: v.clone(),
             })
