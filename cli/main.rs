@@ -18,7 +18,8 @@ fn main() {
     (@subcommand test =>
       (about: "Deserializes and serializes a single asset file")
       (@arg OUT: -o --out +takes_value "Filename to serialize asset to; default: ./out/out.[uasset/uexp]")
-      (@arg PRINT_VALUE: -v --print-value "If present, prints the value of the asset to stdout")
+      (@arg PRINT_VALUE: -v --value "If present, prints the value of the asset to stdout")
+      (@arg PRINT_HEADER: -h --header "If present, prints the header of the asset to stdout")
       (@arg ASSET: +takes_value +required "Path to asset to test")
     )
     (@subcommand all =>
@@ -39,7 +40,8 @@ fn main() {
     let out_file = matches.value_of("OUT").unwrap_or("./out/out");
     let asset_loc = matches.value_of("ASSET").unwrap();
     let print_value = matches.is_present("PRINT_VALUE");
-    test_command(out_file, asset_loc, print_value);
+    let print_header = matches.is_present("PRINT_HEADER");
+    test_command(out_file, asset_loc, print_value, print_header);
   } else if let Some(matches) = matches.subcommand_matches("all") {
     let out_file = matches.value_of("OUT");
     let dir = matches.value_of("DIRECTORY").unwrap();
@@ -47,7 +49,7 @@ fn main() {
   }
 }
 
-fn test_command(out_file: &str, asset_loc: &str, print_value: bool) {
+fn test_command(out_file: &str, asset_loc: &str, print_value: bool, print_header: bool) {
   if let Err(err) = Asset::test_rw(asset_loc.as_ref()) {
     println!("Error testing r/w of asset");
     println!("{:?}", err);
@@ -60,10 +62,13 @@ fn test_command(out_file: &str, asset_loc: &str, print_value: bool) {
       std::process::exit(-1);
     }
     Ok(asset) => {
-      if print_value {
-        println!("{:#?}", asset);
-      }
       asset.recalculate_offsets();
+      if print_header {
+        println!("{:#?}", asset.header);
+      }
+      if print_value {
+        println!("{:#?}", asset.exports);
+      }
       if let Err(err) = asset.write_out(out_file.as_ref()) {
         println!("Failed to write asset");
         println!("{:?}", err);

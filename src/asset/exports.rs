@@ -170,6 +170,6 @@ impl Exports {
 
   pub fn byte_size(&self) -> usize {
     // Always 104 bytes long
-    104
+    104 * self.exports.len()
   }
 }

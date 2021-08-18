@@ -257,7 +257,8 @@ impl Asset {
     let uexp = std::fs::read(uexp_fp.clone())
       .with_context(|| format!("Failed to read uasset from {:?}", uexp_fp))?;
 
-    let asset = Self::read(uasset.clone(), uexp.clone())?;
+    let mut asset = Self::read(uasset.clone(), uexp.clone())?;
+    asset.recalculate_offsets();
     let (uasset_out, uexp_out) = asset.write()?;
 
     if uasset.len() != uasset_out.len() {
@@ -269,20 +270,20 @@ impl Asset {
     }
     if uexp.len() != uexp_out.len() {
       bail!(
-        "Different uexo length after writing: {:04X} to {:04X}",
+        "Different uexp length after writing: {:04X} to {:04X}",
         uexp.len(),
         uexp_out.len()
       )
     }
 
     for (i, (b1, b2)) in uasset.iter().zip(uasset_out.iter()).enumerate() {
-      if b1 != b2 {
+      if *b1 != *b2 {
         bail!("Different byte in uasset after writing at {:04X}", i);
       }
     }
 
     for (i, (b1, b2)) in uexp.iter().zip(uexp_out.iter()).enumerate() {
-      if b1 != b2 {
+      if *b1 != *b2 {
         bail!("Different byte in uexp after writing at {:04X}", i);
       }
     }
@@ -362,6 +363,7 @@ impl Asset {
       + self.names().byte_size()
       + self.imports().byte_size()
       + self.exports().byte_size()
+      + self.header.depends.byte_size()
       + self.assets().byte_size()
       + self.deps().byte_size()) as u32;
     self.summary_mut().name_count = self.names().names.len() as u32;
@@ -380,11 +382,12 @@ impl Asset {
       + self.names().byte_size()
       + self.imports().byte_size()
       + self.exports().byte_size()
-      + 4) as u32;
+      + self.header.depends.byte_size()) as u32;
     self.summary_mut().bulk_data_start_offset = (self.summary().byte_size()
       + self.names().byte_size()
       + self.imports().byte_size()
       + self.exports().byte_size()
+      + self.header.depends.byte_size()
       + self.assets().byte_size()
       + self.deps().byte_size()
       + structs_size) as u32;
@@ -393,6 +396,7 @@ impl Asset {
       + self.names().byte_size()
       + self.imports().byte_size()
       + self.exports().byte_size()
+      + self.header.depends.byte_size()
       + self.assets().byte_size()) as u32;
 
     // Update all generations counts
@@ -404,7 +408,7 @@ impl Asset {
     let mut running_size_total = 0;
     for i in 0..(self.summary().export_count as usize) {
       self.exports_mut().exports[i].export_file_offset = running_size_total as u64;
-      self.exports_mut().exports[i].serial_size = structs_size as u64;
+      self.exports_mut().exports[i].serial_size = self.structs()[i].byte_size() as u64;
       self.exports_mut().exports[i].serial_offset =
         running_size_total + self.summary().total_header_size;
       running_size_total += self.exports().exports[i].serial_size as u32;

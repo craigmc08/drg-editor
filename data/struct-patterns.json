@@ -51,6 +51,31 @@
         }
       ]
     },
+    "LinearColor": {
+      "type": "BinaryProperties",
+      "properties": [
+        {
+          "name": "Red",
+          "type": "Floating",
+          "size": 4
+        },
+        {
+          "name": "Green",
+          "type": "Floating",
+          "size": 4
+        },
+        {
+          "name": "Blue",
+          "type": "Floating",
+          "size": 4
+        },
+        {
+          "name": "Alpha",
+          "type": "Floating",
+          "size": 4
+        }
+      ]
+    },
     "RichCurveKey": {
       "type": "BinaryProperties",
       "properties": [
