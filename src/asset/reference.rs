@@ -8,13 +8,16 @@ use std::io::Cursor;
 #[derive(Debug, Clone, PartialEq)]
 pub enum Reference {
   UObject,
-  Import(NameVariant),
+  Import {
+    class: NameVariant,
+    name: NameVariant,
+  },
   Export(NameVariant),
 }
 
 impl Reference {
-  pub fn import(name: NameVariant) -> Self {
-    Self::Import(name)
+  pub fn import(class: NameVariant, name: NameVariant) -> Self {
+    Self::Import { class, name }
   }
   pub fn export(name: NameVariant) -> Self {
     Self::Export(name)
@@ -26,8 +29,8 @@ impl Reference {
   pub fn serialize(&self, imports: &Imports, exports: &Exports) -> i32 {
     match self {
       Self::UObject => 0,
-      Self::Import(name) => imports
-        .index_of(name)
+      Self::Import { class, name } => imports
+        .index_of(class, name)
         .expect("Invalid Reference::Import name"),
       Self::Export(name) => exports
         .serialized_index_of(name)
@@ -40,7 +43,10 @@ impl Reference {
       Ordering::Equal => Ok(Self::UObject),
       Ordering::Less => {
         let import = imports.lookup((-idx - 1) as u64)?;
-        Ok(Self::Import(import.name.clone()))
+        Ok(Self::Import {
+          class: import.class.clone(),
+          name: import.name.clone(),
+        })
       }
       Ordering::Greater => {
         let export = exports.lookup((idx - 1) as u64)?;
@@ -63,9 +69,15 @@ impl Reference {
   ) -> Result<()> {
     let dep_i = match self {
       Self::UObject => 0,
-      Self::Import(name) => imports
-        .serialized_index_of(name)
-        .with_context(|| format!("Name {} is not imported", name.to_string(names)))?,
+      Self::Import { class, name } => {
+        imports.serialized_index_of(class, name).with_context(|| {
+          format!(
+            "{} # {} is not imported",
+            class.to_string(names),
+            name.to_string(names)
+          )
+        })?
+      }
       Self::Export(name) => exports
         .serialized_index_of(name)
         .with_context(|| format!("Name {} is not exported", name.to_string(names)))?,
@@ -77,7 +89,11 @@ impl Reference {
   pub fn to_string(&self, names: &Names) -> String {
     match self {
       Self::UObject => "UObject".to_string(),
-      Self::Import(name) => format!("Import {}", name.to_string(names)),
+      Self::Import { class, name } => format!(
+        "Import {} # {}",
+        class.to_string(names),
+        name.to_string(names)
+      ),
       Self::Export(name) => format!("Export {}", name.to_string(names)),
     }
   }

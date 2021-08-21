@@ -160,44 +160,52 @@ pub fn input_dependency(
   header: &AssetHeader,
   dep: Reference,
 ) -> Option<Reference> {
-  let mut new_dep = dep.clone();
-
-  let (prev_item, prev_name) = match dep {
-    Reference::UObject => (0, None),
-    Reference::Import(name) => (1, Some(name)),
-    Reference::Export(name) => (2, Some(name)),
-  };
-
-  let mut current_item = prev_item;
-  ComboBox::new(&ImString::new(format!("{} type", label))).build_simple_string(
-    ui,
-    &mut current_item,
-    &[im_str!("UObject"), im_str!("Import"), im_str!("Export")],
-  );
-
   let mut changed = false;
-  if current_item != prev_item {
+
+  let mut current_item = match dep {
+    Reference::UObject => 0,
+    Reference::Import { .. } => 1,
+    Reference::Export(_) => 2,
+  };
+  let mut new_dep: Reference = if ComboBox::new(&ImString::new(format!("{} type", label)))
+    .build_simple_string(
+      ui,
+      &mut current_item,
+      &[im_str!("UObject"), im_str!("Import"), im_str!("Export")],
+    ) {
     changed = true;
-    new_dep = match current_item {
-      0 => Reference::uobject(),
-      1 => Reference::import(prev_name.unwrap_or_else(|| header.list_imports()[0].name.clone())),
-      2 => Reference::export(prev_name.unwrap_or_else(|| header.list_exports()[0].clone())),
+    match current_item {
+      0 => Reference::UObject,
+      1 => Reference::Import {
+        class: header.list_imports()[0].class.clone(),
+        name: header.list_imports()[0].name.clone(),
+      },
+      2 => Reference::Export(header.list_exports()[0].clone()),
       _ => unreachable!(),
     }
-  }
+  } else {
+    dep
+  };
 
   match new_dep.clone() {
     Reference::UObject => {}
-    Reference::Import(name) => ComboBox::new(im_str!("Import"))
-      .preview_value(&ImString::from(name.to_string(&header.names)))
+    Reference::Import { class, name } => ComboBox::new(im_str!("Import"))
+      .preview_value(&ImString::from(format!(
+        "{}::{}",
+        class.to_string(&header.names),
+        name.to_string(&header.names)
+      )))
       .build(&ui, || {
         for import in header.list_imports() {
-          let is_selected = name == import.name;
-          if Selectable::new(&ImString::from(import.name.to_string(&header.names)))
+          let is_selected = name == import.name && class == import.class;
+          if Selectable::new(&ImString::from(import.to_string(&header.names)))
             .selected(is_selected)
             .build(&ui)
           {
-            new_dep = Reference::Import(import.name.clone());
+            new_dep = Reference::Import {
+              class: import.class.clone(),
+              name: import.name.clone(),
+            };
             changed = changed || !is_selected;
           }
         }

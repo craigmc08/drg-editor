@@ -41,6 +41,14 @@ impl Import {
     self.name.write(curs, names).with_context(|| "name")?;
     Ok(())
   }
+
+  pub fn to_string(&self, names: &Names) -> String {
+    format!(
+      "{}::{}",
+      self.class.to_string(names),
+      self.name.to_string(names)
+    )
+  }
 }
 
 impl Imports {
@@ -75,17 +83,17 @@ impl Imports {
     28 * self.objects.len()
   }
 
-  pub fn index_of(&self, object: &NameVariant) -> Option<i32> {
+  pub fn index_of(&self, class: &NameVariant, object: &NameVariant) -> Option<i32> {
     for (i, import) in self.objects.iter().enumerate() {
-      if import.name == *object {
+      if import.name == *object && import.class == *class {
         return Some(-(i as i32) - 1);
       }
     }
     None
   }
 
-  pub fn serialized_index_of(&self, object: &NameVariant) -> Option<u32> {
-    self.index_of(object).map(|i| i as u32)
+  pub fn serialized_index_of(&self, class: &NameVariant, object: &NameVariant) -> Option<u32> {
+    self.index_of(class, object).map(|i| i as u32)
   }
 
   pub fn lookup(&self, index: u64) -> Result<&Import> {
@@ -106,7 +114,7 @@ impl Imports {
     name: NameVariant,
     outer_index: i32,
   ) -> i32 {
-    if let Some(index) = self.serialized_index_of(&name) {
+    if let Some(index) = self.serialized_index_of(&class, &name) {
       // No-op if the object is already imported
       // TODO what to do if different class_package/class/outer_index?
       return -(index as i32) - 1;
