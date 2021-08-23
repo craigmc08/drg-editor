@@ -244,29 +244,6 @@ impl StructValue {
 }
 
 impl StructPatterns {
-  // pub fn from_json(val: &JsonValue) -> Result<Self> {
-  //   let default = match &val["default"] {
-  //     JsonValue::Null => bail!("Missing required default key in struct patterns json"),
-  //     default_pattern_json => StructPattern::from_json(default_pattern_json)
-  //       .with_context(|| "In default pattern for struct patterns")?,
-  //   };
-  //   let patterns = match &val["patterns"] {
-  //     JsonValue::Object(obj) => {
-  //       let mut patterns = HashMap::default();
-  //       for (name, pattern_json) in obj.iter() {
-  //         patterns.insert(
-  //           name.clone(),
-  //           StructPattern::from_json(pattern_json)
-  //             .with_context(|| format!("For pattern '{}' in struct patterns", name))?,
-  //         );
-  //       }
-  //       patterns
-  //     }
-  //     _ => bail!("Missing/wrong type for patterns key in struct patterns json"),
-  //   };
-  //   Ok(Self { default, patterns })
-  // }
-
   pub fn from_file(fp: &Path) -> Result<Self> {
     let contents = std::fs::read_to_string(fp)?;
     let value = serde_json::from_str(&contents)?;

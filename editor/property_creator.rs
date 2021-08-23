@@ -4,6 +4,12 @@ use drg::asset::property::*;
 use drg::asset::*;
 use imgui::*;
 
+pub enum EditStatus {
+  Continue,
+  Cancel,
+  Done,
+}
+
 pub enum ValueCreator {
   WithDefault { for_type: PropType, value: Value },
   Array { inner_type: PropType },
@@ -53,47 +59,63 @@ impl ValueCreator {
   }
 
   /// Returns `true` if `ValueCreator::build` is ready to be called
-  pub fn draw(&mut self, ui: &Ui, _header: &AssetHeader) -> bool {
+  pub fn draw(&mut self, ui: &Ui, _header: &AssetHeader) -> EditStatus {
     match self {
-      Self::WithDefault { .. } => true,
+      Self::WithDefault { .. } => EditStatus::Done,
       Self::Array { inner_type } => {
         input_prop_type(ui, "Element Type", inner_type);
-        Self::done_button(ui)
+        Self::buttons(ui)
       }
 
-      Self::NoCreator { .. } => true,
+      Self::NoCreator { .. } => EditStatus::Done,
     }
   }
 
   // Same as `ValueCreator::draw` but makes a dialog window for itself
-  pub fn draw_dialog(&mut self, label: &str, ui: &Ui, header: &AssetHeader) -> bool {
-    let mut finished = false;
+  pub fn draw_dialog(&mut self, label: &str, ui: &Ui, header: &AssetHeader) -> EditStatus {
+    let mut status = EditStatus::Continue;
+
+    ui.open_popup(&ImString::new(label));
 
     ui.popup_modal(&ImString::new(label))
       .always_auto_resize(true)
       .build(|| {
-        finished = self.draw(ui, header);
-        if ui.button(im_str!("Cancel"), [0.0, 0.0]) {
-          // TODO: how to represent cancel?
-        }
+        status = self.draw(ui, header);
       });
-    finished
+    status
   }
 
-  pub fn build(self, _header: &mut AssetHeader) -> Option<Value> {
+  pub fn build(self, _header: &AssetHeader) -> Option<(Tag, Value)> {
     match self {
-      Self::WithDefault { value, .. } => Some(value),
-      Self::Array { .. } => Some(Value::Array {
-        meta_tag: None, // TODO: This is wrong for some arrays. Fix when adding struct creator
-        values: vec![],
-      }),
+      Self::WithDefault { value, for_type } => Some((Tag::Simple(for_type), value)),
+      Self::Array { inner_type } => Some((
+        Tag::Array { inner_type },
+        Value::Array {
+          meta_tag: None, // TODO: This is wrong for some arrays. Fix when adding struct creator
+          values: vec![],
+        },
+      )),
 
       Self::NoCreator { .. } => None,
     }
   }
 
-  fn done_button(ui: &Ui) -> bool {
-    ui.button(im_str!("Done"), [0.0, 0.0])
+  pub fn for_type(&self) -> PropType {
+    match self {
+      Self::Array { .. } => PropType::ArrayProperty,
+      Self::WithDefault { for_type, .. } => *for_type,
+      Self::NoCreator { for_type } => *for_type,
+    }
+  }
+
+  fn buttons(ui: &Ui) -> EditStatus {
+    if ui.button(im_str!("Done"), [0.0, 0.0]) {
+      EditStatus::Done
+    } else if ui.button(im_str!("Cancel"), [0.0, 0.0]) {
+      EditStatus::Cancel
+    } else {
+      EditStatus::Continue
+    }
   }
 }
 

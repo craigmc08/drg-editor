@@ -22,6 +22,7 @@ pub enum PluginType {
   PluginArray {
     value_type: PropType,
     sub_editors: Vec<EditorPlugin>,
+    value_creator: Option<ValueCreator>,
   },
   PluginBool {
     value: bool,
@@ -116,6 +117,7 @@ impl EditorPlugin {
           PluginType::PluginArray {
             value_type: inner_type,
             sub_editors,
+            value_creator: None,
           }
         } else {
           unreachable!()
@@ -188,6 +190,7 @@ impl EditorPlugin {
       PluginType::PluginArray {
         value_type,
         sub_editors,
+        value_creator,
       } => {
         let mut changed = false;
 
@@ -215,9 +218,32 @@ impl EditorPlugin {
 
         // Add button
         if ui.button(im_str!("Add Element"), [0.0, 0.0]) {
-          changed = true;
-          let sub_editor = EditorPlugin::default_from_type(*value_type, ui, &header);
-          sub_editors.push(sub_editor);
+          *value_creator = Some(ValueCreator::new(*value_type, header));
+        }
+
+        if let Some(mut a_value_creator) = value_creator.take() {
+          match a_value_creator.draw_dialog("New Array Element", ui, header) {
+            EditStatus::Continue => *value_creator = Some(a_value_creator),
+            EditStatus::Cancel => {}
+            EditStatus::Done => {
+              let for_type = a_value_creator.for_type();
+              match a_value_creator.build(header) {
+                None => {
+                  // TODO how to handle case of no value creator
+                  panic!("No value creator for type");
+                }
+                Some((tag, value)) => {
+                  let prop = Property {
+                    meta: Meta::new(NameVariant::parse("None", &header.names), for_type, 0),
+                    tag,
+                    value,
+                  };
+                  sub_editors.push(Self::new(&prop, header));
+                  changed = true;
+                }
+              }
+            }
+          }
         }
 
         changed
@@ -241,30 +267,6 @@ impl EditorPlugin {
         .resize_buffer(true)
         .build(),
     }
-  }
-
-  pub fn default_from_type(typ: PropType, ui: &Ui, header: &AssetHeader) -> Self {
-    let (tag, value) = match typ {
-      PropType::ObjectProperty => (Tag::Simple(typ), Value::Object(Reference::uobject())),
-      PropType::BoolProperty => (Tag::Bool(false), Value::Bool),
-      PropType::IntProperty => (Tag::Simple(typ), Value::Int(0)),
-      PropType::FloatProperty => (Tag::Simple(typ), Value::Float(0.0)),
-      PropType::StrProperty => (Tag::Simple(typ), Value::Str("".to_string())),
-      // TODO ArrayProperty
-      // TODO StructProperty
-      _ => {
-        // TODO better way to handle this error besides panic!ing?
-        panic!("Can't create default property editor for {}", typ)
-      }
-    };
-    Self::new(
-      &Property {
-        meta: Meta::new(NameVariant::new("None", 0, &header.names), typ, 0),
-        tag,
-        value,
-      },
-      header,
-    )
   }
 }
 
