@@ -1,11 +1,14 @@
 use crate::plugins::*;
+use crate::property_creator::*;
 use drg::bindings::AsProperty;
+use drg::property::prop_type::*;
 use drg::*;
 use imgui::*;
 
 pub struct PropertiesEditor {
   selected: Option<SelectedProperty>,
   window_flags: WindowFlags,
+  creator: Option<PropertyCreator>,
 }
 
 struct SelectedProperty {
@@ -20,7 +23,7 @@ impl PropertiesEditor {
     (left, top): (f32, f32),
     (width, height): (f32, f32),
     ui: &Ui,
-    header: &AssetHeader,
+    header: &mut AssetHeader,
     properties: &mut Vec<Property>,
   ) {
     self.draw_property_selector([left, top], [width / 4.0, height], ui, header, properties);
@@ -38,7 +41,7 @@ impl PropertiesEditor {
     pos: [f32; 2],
     size: [f32; 2],
     ui: &Ui,
-    header: &AssetHeader,
+    header: &mut AssetHeader,
     properties: &mut Vec<Property>,
   ) {
     let w = Window::new(im_str!("Properties"))
@@ -49,8 +52,35 @@ impl PropertiesEditor {
       .position(pos, Condition::Always)
       .size(size, Condition::Always);
     w.build(&ui, || {
-      for prop in properties.iter() {
-        let active = Some(&prop.meta.name) == self.selected.as_ref().map(|x| &x.name);
+      // Property creator
+      if ui.button(im_str!("Add Property"), [0.0, 0.0]) {
+        self.creator = Some(PropertyCreator::new(
+          NameVariant::parse("None", &header.names),
+          PropType::IntProperty,
+          header,
+        ));
+      }
+      match self.creator.take() {
+        None => {}
+        Some(mut creator) => match creator.draw("New Property", ui, header) {
+          EditStatus::Continue => {
+            self.creator = Some(creator);
+          }
+          EditStatus::Cancel => {
+            self.creator = None;
+          }
+          EditStatus::Done => {
+            if let Some(prop) = creator.build(header) {
+              properties.push(prop);
+            }
+          }
+        },
+      }
+
+      // Property list
+      let mut to_remove = vec![];
+      for (i, prop) in properties.iter().enumerate() {
+        let mut active = Some(&prop.meta.name) == self.selected.as_ref().map(|x| &x.name);
         if ui.radio_button_bool(
           &ImString::from(prop.meta.name.to_string(&header.names)),
           active,
@@ -61,7 +91,23 @@ impl PropertiesEditor {
             dirty: false,
             plugin: EditorPlugin::new(prop, header),
           });
+          active = true;
         }
+        ui.same_line(0.0);
+        // push and pop id so that same named "X" button works for all elements
+        let id = ui.push_id(i as i32);
+        if ui.button(im_str!("X"), [0.0, 0.0]) {
+          to_remove.push(i);
+          if active {
+            self.selected = None;
+          }
+        }
+        id.pop(ui);
+      }
+
+      // Iterate backwards to prevent invalidating indices
+      for i in to_remove.into_iter().rev() {
+        properties.remove(i);
       }
     });
   }
@@ -117,6 +163,7 @@ impl PropertiesEditor {
     Self {
       selected: self.selected,
       window_flags,
+      creator: None,
     }
   }
 }
@@ -126,6 +173,7 @@ impl Default for PropertiesEditor {
     Self {
       selected: None,
       window_flags: WindowFlags::empty(),
+      creator: None,
     }
   }
 }

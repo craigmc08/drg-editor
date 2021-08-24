@@ -348,7 +348,7 @@ fn draw_properties_editor(
         .position(|x| x == selected_export)
         .expect("Invalid selected export. Report this crash to the maintainer.");
       let properties = &mut asset.exports.structs[struct_idx].properties;
-      properties_editor.draw(left_top, width_height, ui, &asset.header, properties);
+      properties_editor.draw(left_top, width_height, ui, &mut asset.header, properties);
     }
     _ => {
       // don't draw properties if no editor/no selected export
