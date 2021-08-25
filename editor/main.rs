@@ -15,6 +15,7 @@ mod tools;
 
 use drg::asset::*;
 use editor::*;
+use std::env;
 use std::path::*;
 
 fn main() {
@@ -26,7 +27,14 @@ fn main() {
   )
   .get_matches();
 
-  let data_dir: &Path = matches.value_of("DATA").unwrap_or("./data").as_ref();
+  let mut default_data_dir = env::current_exe().unwrap();
+  default_data_dir.pop();
+  default_data_dir.push("data");
+
+  let data_dir: &Path = matches
+    .value_of("DATA")
+    .map(|x| x.as_ref())
+    .unwrap_or(default_data_dir.as_ref());
   let struct_pattern_file = data_dir.join("struct-patterns.json");
   if let Err(err) = struct_pattern::StructPatterns::load(&struct_pattern_file) {
     println!("Failed to load struct patterns: {:?}", err);
